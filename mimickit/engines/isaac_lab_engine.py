@@ -753,7 +753,9 @@ class IsaacLabEngine(engine.Engine):
             visual_material = None
 
         rigid_props = sim_utils.RigidBodyPropertiesCfg(kinematic_enabled=obj_cfg.fix_root,
-                                                       max_depenetration_velocity=10.0)
+                                                       max_depenetration_velocity=10.0,
+                                                       angular_damping=0.01,
+                                                       max_angular_velocity=100.0)
         usd_asset_file = self._parse_usd_path(obj_cfg.asset_file)
         usd_cfg = sim_utils.UsdFileCfg(usd_path=usd_asset_file, 
                                        visual_material=visual_material, 
@@ -785,7 +787,9 @@ class IsaacLabEngine(engine.Engine):
                     enabled_self_collisions=obj_cfg.enable_self_collisions, 
                     fix_root_link=obj_cfg.fix_root)
         
-        rigid_props = sim_utils.RigidBodyPropertiesCfg(max_depenetration_velocity=10.0)
+        rigid_props = sim_utils.RigidBodyPropertiesCfg(max_depenetration_velocity=10.0,
+                                                       angular_damping=0.01,
+                                                       max_angular_velocity=100.0)
         
         usd_asset_file = self._parse_usd_path(obj_cfg.asset_file)
         usd_cfg = sim_utils.UsdFileCfg(usd_path=usd_asset_file, 
