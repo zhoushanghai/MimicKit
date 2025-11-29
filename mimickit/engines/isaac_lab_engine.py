@@ -129,6 +129,8 @@ class IsaacLabEngine(engine.Engine):
                    fix_root=False, start_pos=None, start_rot=None, color=None, disable_motors=False):
         if (start_rot is None):
             start_rot = np.array([1.0, 0.0, 0.0, 0.0])
+        else:
+            start_rot = start_rot[ROT_XYZW_TO_WXYZ]
 
         if (start_pos is None):
             start_pos = np.array([0.0, 0.0, 0.0])
