@@ -482,7 +482,8 @@ class IsaacGymEngine(engine.Engine):
         else:
             asset_options = gymapi.AssetOptions()
             asset_options.angular_damping = 0.01
-            asset_options.max_angular_velocity = 100.0
+            asset_options.max_linear_velocity = 1000.0
+            asset_options.max_angular_velocity = 1000.0
             asset_options.fix_base_link = fix_root
 
             file_dir = os.path.dirname(file)
