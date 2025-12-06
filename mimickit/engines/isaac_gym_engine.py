@@ -98,15 +98,17 @@ class IsaacGymEngine(engine.Engine):
             if (self._has_dof()):
                 has_dof = self._obj_dof_dims[obj_ids.type(torch.long)] > 0
                 dof_obj_ids = obj_ids[has_dof]
-                self._gym.set_dof_state_tensor_indexed(self._sim,
-                                                      gymtorch.unwrap_tensor(self._dof_state_raw),
-                                                      gymtorch.unwrap_tensor(dof_obj_ids), len(dof_obj_ids))
                 
-                dof_pos = self._dof_state_raw[..., :, 0]
-                dof_pos = dof_pos.contiguous()
-                self._gym.set_dof_position_target_tensor_indexed(self._sim,
-                                                      gymtorch.unwrap_tensor(dof_pos),
-                                                      gymtorch.unwrap_tensor(dof_obj_ids), len(dof_obj_ids))
+                if (dof_obj_ids.shape[0] > 0):
+                    self._gym.set_dof_state_tensor_indexed(self._sim,
+                                                        gymtorch.unwrap_tensor(self._dof_state_raw),
+                                                        gymtorch.unwrap_tensor(dof_obj_ids), len(dof_obj_ids))
+                    
+                    dof_pos = self._dof_state_raw[..., :, 0]
+                    dof_pos = dof_pos.contiguous()
+                    self._gym.set_dof_position_target_tensor_indexed(self._sim,
+                                                        gymtorch.unwrap_tensor(dof_pos),
+                                                        gymtorch.unwrap_tensor(dof_obj_ids), len(dof_obj_ids))
 
             self._objs_need_reset[:] = False
 
