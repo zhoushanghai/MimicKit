@@ -441,7 +441,7 @@ class IsaacGymEngine(engine.Engine):
         return
     
     def get_obj_type(self, obj_id):
-        return self._obj_types[obj_id]
+        return self._obj_types[0][obj_id]
     
     def get_obj_num_bodies(self, obj_id):
         env_ptr = self.get_env(0)
@@ -467,7 +467,7 @@ class IsaacGymEngine(engine.Engine):
     def get_control_mode(self):
         return self._control_mode
     
-    def draw_lines(self, env_id, start_verts, end_verts, cols, line_widths):
+    def draw_lines(self, env_id, start_verts, end_verts, cols, line_width):
         env_ptr = self.get_env(env_id)
         num_lines = start_verts.shape[0]
         cols = cols[..., :3]
@@ -478,7 +478,6 @@ class IsaacGymEngine(engine.Engine):
     def _load_asset(self, file, fix_root):
         if (file in self._asset_cache):
             asset = self._asset_cache[file]
-
         else:
             asset_options = gymapi.AssetOptions()
             asset_options.angular_damping = 0.01
