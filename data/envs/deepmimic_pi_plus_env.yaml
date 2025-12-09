@@ -26,7 +26,7 @@ env:
     
     motion_file: "data/motions/hightorque_pi_plus/pi_plus_walk.pkl"
 
-    joint_err_w: [1.0, 1.0, 1.0, 0.6, 0.5, 0.5, 1.0, 1.0, 1.0, 0.6, 0.5, 1.0, 1.0, 1.0, 0.6, 0.5, 0.5, 1.0, 1.0, 1.0, 0.6, 0.5] # for joints, hips 1.0, shoulders 1.0, elbows 0.6, wrists 0.5, knees 0.6, ankles 0.5
+    joint_err_w: [0, 1.0, 1.0, 1.0, 0.6, 0.5, 0.5, 1.0, 1.0, 1.0, 0.6, 0.5, 1.0, 1.0, 1.0, 0.6, 0.5, 0.5, 1.0, 1.0, 1.0, 0.6, 0.5] # for joints, hips 1.0, shoulders 1.0, elbows 0.6, wrists 0.5, knees 0.6, ankles 0.5
     
     reward_pose_w: 0.5
     reward_vel_w: 0.1
