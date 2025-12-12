@@ -19,7 +19,7 @@ env:
 
     enable_early_termination: True
     key_bodies: ["head", "right_hand", "left_hand", "right_foot", "left_foot", "sword"]
-    contact_bodies: ["right_shin", "right_foot", "left_shin", "left_foot"]
+    contact_bodies: ["right_foot", "left_foot"]
     
     motion_file: "data/datasets/dataset_humanoid_sword_shield.yaml"
 

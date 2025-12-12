@@ -21,7 +21,7 @@ env:
 
     enable_early_termination: True
     key_bodies: ["head", "right_hand", "left_hand", "right_foot", "left_foot"]
-    contact_bodies: ["right_lower_arm", "right_hand", "left_lower_arm", "left_hand", "right_shin", "right_foot", "left_shin", "left_foot"]
+    contact_bodies: ["right_hand", "left_hand", "right_foot", "left_foot"]
     
     motion_file: "data/motions/humanoid/humanoid_speed_vault.pkl"
     objects: [{"pos":[2.2, 0.5, 0.2], "file":"data/assets/objects/vault_box.xml"}]
