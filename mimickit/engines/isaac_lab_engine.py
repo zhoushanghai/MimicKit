@@ -398,8 +398,10 @@ class IsaacLabEngine(engine.Engine):
         
         if (env_id is None):
             obj.data.body_link_pose_w[:, :, :3] = body_pos
+            obj.data.body_link_pose_w[:, :, :2] += self._env_offsets.unsqueeze(-2)
         else:
             obj.data.body_link_pose_w[env_id, :, :3] = body_pos
+            obj.data.body_link_pose_w[env_id, :, :2] += self._env_offsets[env_id].unsqueeze(-2)
 
         # don't need to flag reset after setting body states since those 
         # do not directly affect the simulator
@@ -409,11 +411,12 @@ class IsaacLabEngine(engine.Engine):
         obj = self._objs[obj_id]
         body_order_common2sim = self._body_order_common2sim[obj_id]
         body_rot = body_rot[..., body_order_common2sim, :]
+        body_rot_wxyz = body_rot[..., ROT_XYZW_TO_WXYZ]
         
         if (env_id is None):
-            obj.data.body_link_pose_w[:, :, 3:] = body_rot
+            obj.data.body_link_pose_w[:, :, 3:] = body_rot_wxyz
         else:
-            obj.data.body_link_pose_w[env_id, :, 3:] = body_rot
+            obj.data.body_link_pose_w[env_id, :, 3:] = body_rot_wxyz
         return
     
     def set_body_vel(self, env_id, obj_id, body_vel):
