@@ -970,7 +970,7 @@ class IsaacLabEngine(engine.Engine):
         timestep = self.get_timestep()
 
         for obj_id in range(objs_per_env):
-            # find child primitive that contains ActiculationRootAPI
+            # find child primitive that contains ContactReportAPI
             obj_path = OBJ_PATH_TEMPLATE.format(0, obj_id)
             obj_prim = self._stage.GetPrimAtPath(obj_path)
             prim_children = obj_prim.GetAllChildren()
