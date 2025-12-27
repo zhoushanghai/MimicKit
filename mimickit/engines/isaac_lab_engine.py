@@ -961,20 +961,39 @@ class IsaacLabEngine(engine.Engine):
     
     def _build_ground_contact_sensors(self):
         from isaaclab.sensors import ContactSensorCfg, ContactSensor
+        from pxr import PhysxSchema
 
+        ground_prim_paths = [GROUND_PATH + ".*"]
+        
         self._ground_contact_sensors = []
         objs_per_env = self.get_objs_per_env()
         timestep = self.get_timestep()
 
         for obj_id in range(objs_per_env):
-            obj_type = self.get_obj_type(obj_id)
-            if (obj_type == engine.ObjType.articulated):
-                filter_prim_paths = [GROUND_PATH + ".*"]
+            # find child primitive that contains ActiculationRootAPI
+            obj_path = OBJ_PATH_TEMPLATE.format(0, obj_id)
+            obj_prim = self._stage.GetPrimAtPath(obj_path)
+            prim_children = obj_prim.GetAllChildren()
+                
+            contact_prim_path = None
+            for prim_child in prim_children:
+                prim_grandchildren = prim_child.GetAllChildren()
+                
+                if (len(prim_grandchildren) > 0):
+                    prim_grandchild = prim_grandchildren[0]
+                    has_contact_api = prim_grandchild.HasAPI(PhysxSchema.PhysxContactReportAPI)
+                    
+                    if (has_contact_api):
+                        contact_prim_path = prim_child.GetPrimPath().pathString
+                        break
 
-                regex = OBJ_PATH_TEMPLATE.format(".*", obj_id) + "/robot/.*"
-                sensor_cfg = ContactSensorCfg(prim_path=regex, 
+            if (contact_prim_path is not None):
+                contact_prim_name = os.path.basename(contact_prim_path)
+                sensor_regex = OBJ_PATH_TEMPLATE.format(".*", obj_id) + "/{:s}/.*".format(contact_prim_name)
+
+                sensor_cfg = ContactSensorCfg(prim_path=sensor_regex, 
                                               update_period=timestep,
-                                              filter_prim_paths_expr=filter_prim_paths)
+                                              filter_prim_paths_expr=ground_prim_paths)
                 sensor = ContactSensor(sensor_cfg)
             else:
                 sensor = None
