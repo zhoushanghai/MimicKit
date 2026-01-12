@@ -6,8 +6,6 @@ import util.torch_util as torch_util
 
 
 class DummyAgent(base_agent.BaseAgent):
-    NAME = "dummy"
-
     def __init__(self, env, device):
         super().__init__(None, env, device)
         return

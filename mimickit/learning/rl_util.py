@@ -22,5 +22,5 @@ def compute_td_lambda_return(r, next_vals, done, discount, td_lambda):
         curr_lambda = td_lambda * (1.0 - curr_reset)
         curr_val = curr_r + discount * ((1.0 - curr_lambda) * next_v + curr_lambda * next_ret)
         return_t[i] = curr_val
-
+    
     return return_t

@@ -9,8 +9,6 @@ import util.mp_util as mp_util
 import util.torch_util as torch_util
 
 class PPOAgent(base_agent.BaseAgent):
-    NAME = "PPO"
-
     def __init__(self, config, env, device):
         super().__init__(config, env, device)
         return
@@ -35,7 +33,6 @@ class PPOAgent(base_agent.BaseAgent):
         self._exp_anneal_samples = config.get("exp_anneal_samples", np.inf)
         self._exp_prob_beg = config.get("exp_prob_beg", 1.0)
         self._exp_prob_end = config.get("exp_prob_end", 1.0)
-        
         return
 
     def _build_model(self, config):
@@ -68,6 +65,7 @@ class PPOAgent(base_agent.BaseAgent):
         elif (self._mode == base_agent.AgentMode.TEST):
             norm_a = norm_action_dist.mode
             rand_action_mask = torch.zeros_like(norm_a[..., 0])
+            
         else:
             assert(False), "Unsupported agent mode: {}".format(self._mode)
             

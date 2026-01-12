@@ -12,7 +12,6 @@ class TBLogger(logger.Logger):
         self._writer = None
         self._step_var_key = None
         self._collections = dict()
-        
         return
     
     def reset(self):
@@ -58,7 +57,6 @@ class TBLogger(logger.Logger):
                     val = entry.val
                     tag = self._key_tags[i]
                     self._writer.add_scalar(tag, val, step_val)
-
         return
     
     def _add_collection(self, name, key):

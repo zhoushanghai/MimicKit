@@ -14,7 +14,6 @@ class ExperienceBuffer():
         self._sample_buf = torch.randperm(self.get_capacity(), device=self._device, dtype=torch.long)
         self._sample_buf_head = 0
         self._reset_sample_buf()
-
         return
 
     def add_buffer(self, name, data_shape, dtype):
@@ -144,6 +143,7 @@ class ExperienceBuffer():
         if (self._sample_buf_head + n <= buffer_len):
             rand_idx = self._sample_buf[self._sample_buf_head:self._sample_buf_head + n]
             self._sample_buf_head += n
+            
         else:
             rand_idx0 = self._sample_buf[self._sample_buf_head:]
             remainder = n - (buffer_len - self._sample_buf_head)

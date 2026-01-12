@@ -22,22 +22,30 @@ We also include the following RL algorithms:
 
 ## Installation
 
-This framework supports different simulator backends. First, install the simulator of your choice. We highly recommend using a package manager, like [Conda](https://docs.conda.io/projects/conda/en/stable/user-guide/install/index.html), to create dedicated Python environments for each simulator.
+This framework supports different simulator backends (referred to as `Engines`). First, install the simulator of your choice. We highly recommend using a package manager, like [Conda](https://docs.conda.io/projects/conda/en/stable/user-guide/install/index.html), to create dedicated Python environments for each simulator.
 
 <details>
 <summary>Isaac Gym</summary>
 
 Install [Isaac Gym](https://developer.nvidia.com/isaac-gym).
 
-To use Isaac Gym, set [`engine_name`](data/envs/deepmimic_humanoid_env.yaml) in the environment configuration files to `isaac_gym`.
+To use Isaac Gym, specify the argument `--engine_config data/engines/isaac_gym_engine.yaml` when running the code.
 </details>
 
 <details>
 <summary>Isaac Lab</summary>
 
-Install [Isaac Lab](https://isaac-sim.github.io/IsaacLab/main/source/setup/installation/index.html).
+Install [Isaac Lab](https://isaac-sim.github.io/IsaacLab/main/source/setup/installation/index.html). This framework has been tested with `2ed331acfcbb1b96c47b190564476511836c3754`.
 
-To use Isaac Lab, set [`engine_name`](data/envs/deepmimic_humanoid_env.yaml) in the environment configuration files to `isaac_lab`.
+To use Isaac Lab, specify the argument `--engine_config data/engines/isaac_lab_engine.yaml` when running the code.
+</details>
+
+<details>
+<summary>Newton</summary>
+
+Install [Newton](https://newton-physics.github.io/newton/guide/installation.html).
+
+To use Newton, specify the argument `--engine_config data/engines/newton_engine.yaml` when running the code. This framework has been tested with `cde9610aff71995d793f9b60e6dc26299e29885c`.
 </details>
 
 After that, install the requirements:
@@ -53,16 +61,16 @@ Download assets and motion data from [here](https://1sfu-my.sharepoint.com/:u:/g
 
 To train a model, run the following command:
 ```
-python mimickit/run.py --mode train --num_envs 4096 --env_config data/envs/deepmimic_humanoid_env.yaml --agent_config data/agents/deepmimic_humanoid_ppo_agent.yaml --visualize true --log_file output/log.txt --out_model_file output/model.pt
+python mimickit/run.py --mode train --num_envs 4096 --engine_config data/engines/isaac_gym_engine.yaml --env_config data/envs/deepmimic_humanoid_env.yaml --agent_config data/agents/deepmimic_humanoid_ppo_agent.yaml --visualize true --out_dir output/
 ```
 - `--mode` selects either `train` or `test` mode.
-- `--num_envs` specifies the number of parallel environments used for simulation.
-- `--env_config` specifies the configuration file for the environment.
-- `--agent_config` specifies configuration file for the agent.
+- `--num_envs` the number of parallel environments used for simulation. Not all environments support parallel envs, this is mainly used for Isaac Gym envs and other environments, like DeepMind Control Suite does not support this feature and should therefore use 1 for the number of envs.
+- `--engine_config` configuration file for the engine to select between different simulator backends.
+- `--env_config` configuration file for the environment.
+- `--agent_config` configuration file for the agent.
 - `--visualize` enables visualization. Rendering should be disabled for faster training.
-- `--log_file` specifies the output log file, which will keep track of statistics during training.
-- `--out_model_file` specifies the output model file, which contains the model parameters.
-- `--logger` specifies the logger used to record training stats. The options are TensorBoard `tb` or `wandb`.
+- `--out_dir` the output directory where the models and logs will be saved.
+- `--logger` the logger used to record training stats. The options are TensorBoard `tb` or `wandb`.
 
 Instead of specifying all arguments through the command line, arguments can also be loaded from an `arg_file`:
 ```
@@ -88,13 +96,30 @@ python mimickit/run.py --arg_file args/deepmimic_humanoid_ppo_args.txt --devices
 ``` 
 - `--devices` specifies the devices used for training, which can be `cpu` or `cuda:{i}`. Multiple devices can be provided to parallelize training across multiple processes.
 
+
+## Methods
+
+More detailed instrctions for each method are available here:
+- [DeepMimic](docs/README_DeepMimic.md)
+- [AMP](docs/README_AMP.md)
+- [ASE](docs/README_ASE.md)
+- [ADD](docs/README_ADD.md)
+
+
+## Visualizer UI
+
+- **Camera control:** Hold `Alt` key and drag with the left mouse button to pan the camera. Scroll with the mouse wheel to zoom in/out.
+- **Pause Simulation:** `Enter` key can be used to pause/unpause the simulation
+- **Step Simulation:** `Space` key can be used to step the simulator one step at a time.
+
+
 ## Visualizing Training Logs
 
 When using the TensorBoard logger during training, a TensorBoard `events` file will be saved in the same output directory as the log file. The log can be viewed with:
 ```
 tensorboard --logdir=output/ --port=6006 --samples_per_plugin scalars=999999
 ```
-The output log `.txt` file can also be plotted using the plotting script [`plot_log.py`](tools/plot_log/plot_log.py).
+The output `log.txt` file can also be plotted using the plotting script [`plot_log.py`](tools/plot_log/plot_log.py).
 
 ---
 

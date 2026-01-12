@@ -8,23 +8,23 @@ import numpy as np
 import torch
 
 class ViewMotionEnv(char_env.CharEnv):
-    def __init__(self, config, num_envs, device, visualize):
+    def __init__(self, env_config, engine_config, num_envs, device, visualize):
         self._time_scale = 1.0
+        engine_config["sim_freq"] = engine_config["control_freq"]
 
-        super().__init__(config=config, num_envs=num_envs, device=device,
-                         visualize=visualize)
-        
+        super().__init__(env_config=env_config, engine_config=engine_config,
+                         num_envs=num_envs, device=device, visualize=visualize)
         return
 
-    def _build_envs(self, config, num_envs):
-        super()._build_envs(config, num_envs)
+    def _build_envs(self, env_config, num_envs):
+        super()._build_envs(env_config, num_envs)
 
-        motion_file = config["env"]["motion_file"]
+        motion_file = env_config["motion_file"]
         self._load_motions(motion_file)
         return
     
-    def _build_character(self, env_id, config, color=None):
-        char_file = config["env"]["char_file"]
+    def _build_character(self, env_id, env_config, color=None):
+        char_file = env_config["char_file"]
         char_id = self._engine.create_obj(env_id=env_id, 
                                           obj_type=engine.ObjType.articulated,
                                           asset_file=char_file, 
@@ -75,9 +75,9 @@ class ViewMotionEnv(char_env.CharEnv):
         self._engine.set_body_rot(None, char_id, body_rot)
         return
 
-    def _render(self):
+    def _render_scene(self):
+        super()._render_scene()
         self._render_key_points()
-        super()._render()
         return
     
     def _build_sim_tensors(self, config):
@@ -90,12 +90,8 @@ class ViewMotionEnv(char_env.CharEnv):
         return
 
     def _get_env_motion_ids(self):
-        num_envs = self.get_num_envs()
         num_motions = self._motion_lib.get_num_motions()
-
-        motion_ids = torch.arange(num_envs, device=self._device)
-        motion_ids = torch.remainder(motion_ids, num_motions)
-
+        motion_ids = torch.remainder(self._env_ids, num_motions)
         return motion_ids
 
     def _update_done(self):
@@ -144,10 +140,11 @@ class ViewMotionEnv(char_env.CharEnv):
         engine_name = self._engine.get_name()
         if (engine_name == "isaac_lab"):
             col = np.array([0.25, 0.4, 0.1])
+        elif (engine_name == "newton"):
+            col = np.array([0.3, 0.5, 0.1])
         else:
             col = np.array([0.5, 0.9, 0.1])
         return col
-
 
 
 @torch.jit.script

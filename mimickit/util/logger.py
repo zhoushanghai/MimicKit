@@ -78,6 +78,7 @@ class Logger:
             self._max_key_len = max(self._max_key_len, len(key))
         else:
             assert key in self.log_headers, "Trying to introduce a new key %s that you didn't include in the first iteration"%key
+        
         self.log_current_row[key] = Logger.Entry(val, quiet)
         self._need_update = True
         return
@@ -89,7 +90,6 @@ class Logger:
         """
         Print all of the diagnostics from the current iteration
         """
-        
         if (mp_util.enable_mp() and self._need_update):
             self._mp_aggregate()
 

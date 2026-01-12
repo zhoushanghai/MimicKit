@@ -7,11 +7,10 @@ import util.circular_buffer as circular_buffer
 import util.torch_util as torch_util
 
 class AMPEnv(deepmimic_env.DeepMimicEnv):
-    def __init__(self, config, num_envs, device, visualize):
-        env_config = config["env"]
+    def __init__(self, env_config, engine_config, num_envs, device, visualize):
         self._num_disc_obs_steps = env_config["num_disc_obs_steps"]
 
-        super().__init__(config=config, num_envs=num_envs, device=device,
+        super().__init__(env_config=env_config, engine_config=engine_config, num_envs=num_envs, device=device,
                          visualize=visualize)
         return
 
@@ -148,11 +147,10 @@ class AMPEnv(deepmimic_env.DeepMimicEnv):
                                                                  shape=body_pos.shape[1:],
                                                                  dtype=body_pos.dtype,
                                                                  device=self._device)
-        
+
         disc_obs_space = self.get_disc_obs_space()
         disc_obs_dtype = torch_util.numpy_dtype_to_torch(disc_obs_space.dtype)
         self._disc_obs_buf = torch.zeros([num_envs] + list(disc_obs_space.shape), device=self._device, dtype=disc_obs_dtype)
-
         return
 
     def _update_misc(self):
@@ -179,7 +177,6 @@ class AMPEnv(deepmimic_env.DeepMimicEnv):
         
         joint_rot = self._kin_char_model.dof_to_rot(dof_pos)
         self._disc_hist_joint_rot.push(joint_rot)
-
         return
     
     def _update_ref_motion(self):
@@ -297,7 +294,6 @@ class AMPEnv(deepmimic_env.DeepMimicEnv):
         self._disc_hist_joint_rot.fill(env_ids, joint_rot)
         self._disc_hist_dof_vel.fill(env_ids, dof_vel)
         self._disc_hist_body_pos.fill(env_ids, body_pos)
-
         return
 
     

@@ -1,5 +1,7 @@
 from isaaclab.app import AppLauncher
 
+import carb
+
 import numpy as np
 import os
 import torch
@@ -16,6 +18,21 @@ ENV_PATH_TEMPLATE = "/World/envs/env_{}"
 OBJ_PATH_TEMPLATE = "/World/envs/env_{}/obj_{}"
 GROUND_PATH = "/World/ground"
 LIGHT_PATH = "/World/Light"
+
+def str_to_key_code(key_str):
+    key_name = key_str.upper()
+
+    if (key_str == "ESC"):
+        key_name = "ESCAPE"
+    elif (key_str == "RETURN"):
+        key_name = "ENTER"
+    elif (key_str == "DELETE"):
+        key_name = "DEL"
+    elif (len(key_str) == 1 and key_str.isdigit()):
+        key_name = "KEY_" + key_str
+    
+    key_code = getattr(carb.input.KeyboardInput, key_name)
+    return key_code
 
 class ObjCfg:
     def __init__(self, obj_type, asset_file, is_visual, enable_self_collisions, 
@@ -54,6 +71,7 @@ class IsaacLabEngine(engine.Engine):
         self._timestep = 1.0 / control_freq
         self._sim_steps = int(sim_freq / control_freq)
         sim_timestep = 1.0 / sim_freq
+
         self._create_simulator(sim_timestep, visualize)
 
         self._env_spacing = config["env_spacing"]
@@ -73,6 +91,7 @@ class IsaacLabEngine(engine.Engine):
             self._build_lights()
             self._build_camera()
             self._build_draw_interface()
+            self._setup_keyboard()
 
         return
     
@@ -105,6 +124,8 @@ class IsaacLabEngine(engine.Engine):
         return
     
     def step(self):
+        self._update_reset_objs()
+        
         for i in range(self._sim_steps):
             self._pre_sim_step()
             self._sim_step()
@@ -113,21 +134,9 @@ class IsaacLabEngine(engine.Engine):
         self._clear_forces()
         return
 
-    def update_sim_state(self):
-        num_objs = self.get_objs_per_env()
-
-        for obj_id in range(num_objs):
-            reset_flags = self._objs_need_reset[:, obj_id]
-            env_ids = reset_flags.nonzero(as_tuple=False)
-            env_ids = env_ids.type(torch.int32).flatten()
-
-            if (len(env_ids) > 0):
-                self._reset_obj(obj_id, env_ids)
-                self._objs_need_reset[:, obj_id] = False
-        return
-    
     def create_obj(self, env_id, obj_type, asset_file, name, is_visual=False, enable_self_collisions=True, 
-                   fix_root=False, start_pos=None, start_rot=None, color=None, disable_motors=False):
+                   fix_root=False, start_pos=None, start_rot=None, 
+                   color=None, disable_motors=False):
         if (start_rot is None):
             start_rot = np.array([1.0, 0.0, 0.0, 0.0])
         else:
@@ -147,7 +156,7 @@ class IsaacLabEngine(engine.Engine):
                          enable_self_collisions=enable_self_collisions,
                          fix_root=fix_root, 
                          start_pos=start_pos, 
-                         start_rot=start_rot, 
+                         start_rot=start_rot,
                          color=color, 
                          disable_motors=disable_motors)
         
@@ -175,7 +184,7 @@ class IsaacLabEngine(engine.Engine):
             assert(False), "Unsupported control mode: {}".format(self._control_mode)
         return
     
-    def update_camera(self, pos, look_at):
+    def set_camera_pose(self, pos, look_at):
         env_offset = self._env_offsets[0].cpu().numpy()
         cam_pos = pos.copy()
         cam_look_at = look_at.copy()
@@ -192,6 +201,15 @@ class IsaacLabEngine(engine.Engine):
                             cam_state_pos[1] - env_offset[1], 
                             cam_state_pos[2]])
         return cam_pos
+    
+    def get_camera_dir(self):
+        cam_state_pos = self._camera_state.position_world
+        cam_state_target = self._camera_state.target_world
+        cam_delta = np.array([cam_state_target[0] - cam_state_pos[0],
+                              cam_state_target[1] - cam_state_pos[1],
+                              cam_state_target[2] - cam_state_pos[2]])
+        cam_dir = cam_delta / np.linalg.norm(cam_delta)
+        return cam_dir
     
     def render(self):
         self._sim.render()
@@ -467,7 +485,7 @@ class IsaacLabEngine(engine.Engine):
                                               is_global=True)
         return
     
-    def get_obj_torque_lim(self, env_id, obj_id):
+    def get_obj_torque_limits(self, env_id, obj_id):
         obj = self._objs[obj_id]
         torque_lim = obj.root_physx_view.get_dof_max_forces()[env_id]
 
@@ -543,6 +561,12 @@ class IsaacLabEngine(engine.Engine):
         self._draw_interface.draw_lines(start_pts.tolist(), end_pts.tolist(), cols.tolist(), line_widths)
         return
 
+    def register_keyboard_callback(self, key_str, callback_func):
+        key_code = str_to_key_code(key_str)
+        assert(key_code not in self._keyboard_callbacks)
+        self._keyboard_callbacks[key_code] = callback_func
+        return
+
     def _build_ground(self):
         import isaaclab.sim as sim_utils
         from isaaclab.sim.spawners.from_files import GroundPlaneCfg, spawn_ground_plane
@@ -589,9 +613,9 @@ class IsaacLabEngine(engine.Engine):
         import isaacsim.core.utils.prims as prim_utils
         from pxr import Gf
 
-        light_quat = torch_util.quat_from_euler_xyz(torch.tensor(0.7), 
-                                                    torch.tensor(0.0), 
-                                                    torch.tensor(0.6))
+        light_quat = torch_util.euler_xyz_to_quat(torch.tensor(0.7),
+                                                  torch.tensor(0.0), 
+                                                  torch.tensor(0.6))
         light_quat = light_quat.tolist()
         distant_light_path = LIGHT_PATH + "/distant_light_xform"
         light_xform = prim_utils.create_prim(distant_light_path, "Xform")
@@ -616,6 +640,16 @@ class IsaacLabEngine(engine.Engine):
     def _build_draw_interface(self):
         from isaacsim.util.debug_draw import _debug_draw
         self._draw_interface = _debug_draw.acquire_debug_draw_interface()
+        return
+    
+    def _setup_keyboard(self):
+        import omni
+
+        self._input = carb.input.acquire_input_interface()
+        self._keyboard = omni.appwindow.get_default_app_window().get_keyboard()
+        self._sub_keyboard = self._input.subscribe_to_keyboard_events(self._keyboard, self._on_keyboard_event)
+
+        self._keyboard_callbacks = dict()
         return
     
     def _create_simulator(self, sim_timestep, visualize):
@@ -766,6 +800,7 @@ class IsaacLabEngine(engine.Engine):
         # build a object to wrap all of the objects in the parallel envs
         obj_cfg = self._obj_cfgs[0][obj_id]
         multi_obj_prim = self._build_multi_obj_prim(obj_id, obj_cfg)
+
         return multi_obj_prim
     
     def _build_obj_prim(self, env_id, obj_id, obj_cfg):
@@ -1039,7 +1074,6 @@ class IsaacLabEngine(engine.Engine):
     def _build_sim_tensors(self):
         num_envs = self.get_num_envs()
         num_objs = self.get_objs_per_env()
-
         self._objs_need_reset = torch.zeros([num_envs, num_objs], device=self._device, dtype=torch.bool)
         return
     
@@ -1057,6 +1091,19 @@ class IsaacLabEngine(engine.Engine):
             self._objs_need_reset[:, obj_id] = True
         elif (len(env_id) > 0):
             self._objs_need_reset[env_id, obj_id] = True
+        return
+    
+    def _update_reset_objs(self):
+        num_objs = self.get_objs_per_env()
+
+        for obj_id in range(num_objs):
+            reset_flags = self._objs_need_reset[:, obj_id]
+            env_ids = reset_flags.nonzero(as_tuple=False)
+            env_ids = env_ids.type(torch.int32).flatten()
+
+            if (len(env_ids) > 0):
+                self._reset_obj(obj_id, env_ids)
+                self._objs_need_reset[:, obj_id] = False
         return
     
     def _reset_obj(self, obj_id, env_ids):
@@ -1094,3 +1141,10 @@ class IsaacLabEngine(engine.Engine):
             assert(False), "No physics scene found! Please make sure one exists."
         
         return physics_scene_path
+    
+    def _on_keyboard_event(self, event):
+        if (event.type == carb.input.KeyboardEventType.KEY_PRESS):
+            if (event.input in self._keyboard_callbacks):
+                callback = self._keyboard_callbacks[event.input]
+                callback()
+        return

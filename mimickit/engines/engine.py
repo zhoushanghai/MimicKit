@@ -40,17 +40,17 @@ class Engine:
     @abc.abstractmethod
     def step(self):
         return
-
-    @abc.abstractmethod
-    def update_sim_state(self):
-        return
     
     @abc.abstractmethod
-    def update_camera(self, pos, look_at):
+    def set_camera_pose(self, pos, look_at):
         return
     
     @abc.abstractmethod
     def get_camera_pos(self):
+        return
+    
+    @abc.abstractmethod
+    def get_camera_dir(self):
         return
     
     @abc.abstractmethod
@@ -116,11 +116,6 @@ class Engine:
     @abc.abstractmethod
     def get_ground_contact_forces(self, obj_id):
         return
-
-    @abc.abstractmethod
-    def get_ground_contact_forces(self, obj_id):
-        return
-
     
     @abc.abstractmethod
     def set_root_pos(self, env_id, obj_id, root_pos):
@@ -158,7 +153,6 @@ class Engine:
     def set_body_forces(self, env_id, obj_id, body_id, forces):
         return
     
-    
     @abc.abstractmethod
     def get_obj_type(self, obj_id):
         return
@@ -180,7 +174,7 @@ class Engine:
         return 
     
     @abc.abstractmethod
-    def get_obj_torque_lim(self, env_id, obj_id):
+    def get_obj_torque_limits(self, env_id, obj_id):
         return
     
     @abc.abstractmethod
@@ -196,4 +190,7 @@ class Engine:
         return
     
     def draw_lines(self, env_id, start_verts, end_verts, cols, line_width):
+        return
+    
+    def register_keyboard_callback(self, key_str, callback_func):
         return

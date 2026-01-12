@@ -1,6 +1,5 @@
 import isaacgym.gymapi as gymapi
 import isaacgym.gymtorch as gymtorch
-import isaacgym.gymutil as gymutil
 
 import numpy as np
 import os
@@ -10,13 +9,45 @@ import torch
 import time
 
 import engines.engine as engine
+import util.torch_util as torch_util
+
+def str_to_key_code(key_str):
+    key_str = key_str.upper()
+
+    if (key_str == "ESC"):
+        key_name = "KEY_ESCAPE"
+    elif (key_str == "RETURN"):
+        key_name = "KEY_ENTER"
+    elif (key_str == "DELETE"):
+        key_name = "KEY_DEL"
+    else:
+        key_name = "KEY_" + key_str
+    
+    key_code = getattr(gymapi.KeyboardInput, key_name)
+    return key_code
+
+class AssetCfg():
+    def __init__(self, asset_file, fix_root):
+        self.asset_file = asset_file
+        self.fix_root = fix_root
+        return
+    
+    def __hash__(self):
+        values = (self.asset_file, self.fix_root)
+        asset_hash = hash(values)
+        return asset_hash
+    
+    def __eq__(self, other):
+        same = self.asset_file == other.asset_file
+        same &= self.fix_root == other.fix_root
+        return same
+
 
 class IsaacGymEngine(engine.Engine):
     def __init__(self, config, num_envs, device, visualize):
         super().__init__()
         self._device = device
         self._num_envs = num_envs
-        self._enable_viewer_sync = True
         self._asset_cache = dict()
         
         self._gym = gymapi.acquire_gym()
@@ -49,6 +80,7 @@ class IsaacGymEngine(engine.Engine):
 
         if (visualize):
             self._build_viewer()
+            self._keyboard_callbacks = dict()
             self._prev_frame_time = 0.0
 
         return
@@ -60,6 +92,7 @@ class IsaacGymEngine(engine.Engine):
         env_spacing = self._get_env_spacing() / 2.0
         num_envs = self.get_num_envs()
         num_env_per_row = int(np.sqrt(num_envs))
+
         lower = gymapi.Vec3(-env_spacing, -env_spacing, 0.0)
         upper = gymapi.Vec3(env_spacing, env_spacing, env_spacing)
         env_ptr = self._gym.create_env(self._sim, lower, upper, num_env_per_row)
@@ -75,9 +108,11 @@ class IsaacGymEngine(engine.Engine):
     def initialize_sim(self):
         self._gym.prepare_sim(self._sim)
         self._build_sim_tensors()
+        self._refresh_sim_tensors()
         return
     
     def step(self):
+        self._update_reset_objs()
         self._apply_cmd()
 
         for i in range(self._sim_steps):
@@ -87,35 +122,9 @@ class IsaacGymEngine(engine.Engine):
         self._refresh_sim_tensors()
         return
 
-    def update_sim_state(self):
-        obj_ids = self._need_reset_buf.nonzero(as_tuple=False)
-        obj_ids = obj_ids.type(torch.int32).flatten()
-
-        if (len(obj_ids) > 0):
-            self._gym.set_actor_root_state_tensor_indexed(self._sim,
-                                                         gymtorch.unwrap_tensor(self._root_state_raw),
-                                                         gymtorch.unwrap_tensor(obj_ids), len(obj_ids))
-            if (self._has_dof()):
-                has_dof = self._obj_dof_dims[obj_ids.type(torch.long)] > 0
-                dof_obj_ids = obj_ids[has_dof]
-                
-                if (dof_obj_ids.shape[0] > 0):
-                    self._gym.set_dof_state_tensor_indexed(self._sim,
-                                                        gymtorch.unwrap_tensor(self._dof_state_raw),
-                                                        gymtorch.unwrap_tensor(dof_obj_ids), len(dof_obj_ids))
-                    
-                    dof_pos = self._dof_state_raw[..., :, 0]
-                    dof_pos = dof_pos.contiguous()
-                    self._gym.set_dof_position_target_tensor_indexed(self._sim,
-                                                        gymtorch.unwrap_tensor(dof_pos),
-                                                        gymtorch.unwrap_tensor(dof_obj_ids), len(dof_obj_ids))
-
-            self._objs_need_reset[:] = False
-
-        return
-    
     def create_obj(self, env_id, obj_type, asset_file, name, is_visual=False, enable_self_collisions=True, 
-                     fix_root=False, start_pos=None, start_rot=None, color=None, disable_motors=False):
+                     fix_root=False, start_pos=None, start_rot=None,
+                     color=None, disable_motors=False):
         segmentation_id = 0
 
         start_pose = gymapi.Transform()
@@ -193,7 +202,7 @@ class IsaacGymEngine(engine.Engine):
             obj_cmd[:] = cmd
         return
     
-    def update_camera(self, pos, look_at):
+    def set_camera_pose(self, pos, look_at):
         self._gym.viewer_camera_look_at(self._viewer, None, 
                                       gymapi.Vec3(pos[0], pos[1], pos[2]),
                                       gymapi.Vec3(look_at[0], look_at[1], look_at[2]))
@@ -204,46 +213,39 @@ class IsaacGymEngine(engine.Engine):
         cam_pos = np.array([cam_trans.p.x, cam_trans.p.y, cam_trans.p.z])
         return cam_pos
     
+    def get_camera_dir(self):
+        cam_trans = self._gym.get_viewer_camera_transform(self._viewer, None)
+        cam_rot = torch.tensor([cam_trans.r.x, cam_trans.r.y, cam_trans.r.z, cam_trans.r.w], device="cpu")
+        ref_dir = torch.tensor([0.0, 0.0, 1.0], device="cpu")
+        cam_dir = torch_util.quat_rotate(cam_rot, ref_dir)
+        cam_dir = cam_dir.numpy()
+        return cam_dir
+    
     def render(self):
-        # check for window closed
-        if (self._gym.query_viewer_has_closed(self._viewer)):
-            sys.exit()
-
-        # check for keyboard events
-        for evt in self._gym.query_viewer_action_events(self._viewer):
-            if evt.action == "QUIT" and evt.value > 0:
-                sys.exit()
-            elif evt.action == "toggle_viewer_sync" and evt.value > 0:
-                self._enable_viewer_sync = not self._enable_viewer_sync
+        self._process_gui_events()
 
         # fetch results
         if (self._device != "cpu"):
             self._gym.fetch_results(self._sim, True)
-                
-        # step graphics
-        if (self._enable_viewer_sync):
-            self._gym.step_graphics(self._sim)
-            self._gym.draw_viewer(self._viewer, self._sim, True)
-
-            # Wait for dt to elapse in real time.
-            # This synchronizes the physics simulation with the rendering rate.
-            self._gym.sync_frame_time(self._sim)
-
-            # it seems that in some cases sync_frame_time still results in higher-than-realtime framerate
-            # this code will slow down the rendering to real time
-            now = time.time()
-            delta = now - self._prev_frame_time
-            time_step = self.get_timestep()
-
-            if (delta < time_step):
-                time.sleep(time_step - delta)
-
-            self._prev_frame_time = time.time()
-
-        else:
-            self._gym.poll_viewer_events(self._viewer)
-            
+        
+        self._gym.step_graphics(self._sim)
+        self._gym.draw_viewer(self._viewer, self._sim, True)
         self._gym.clear_lines(self._viewer)
+
+        # Wait for dt to elapse in real time.
+        # This synchronizes the physics simulation with the rendering rate.
+        self._gym.sync_frame_time(self._sim)
+
+        # it seems that in some cases sync_frame_time still results in higher-than-realtime framerate
+        # this code will slow down the rendering to real time
+        now = time.time()
+        delta = now - self._prev_frame_time
+        time_step = self.get_timestep()
+
+        if (delta < time_step):
+            time.sleep(time_step - delta)
+
+        self._prev_frame_time = time.time()
         return
     
     def get_timestep(self):
@@ -400,7 +402,7 @@ class IsaacGymEngine(engine.Engine):
             self._has_body_forces = True
         return
     
-    def get_obj_torque_lim(self, env_id, obj_id):
+    def get_obj_torque_limits(self, env_id, obj_id):
         return self._obj_torque_lim[obj_id][env_id].cpu().numpy()
     
     def get_obj_dof_limits(self, env_id, obj_id):
@@ -472,14 +474,25 @@ class IsaacGymEngine(engine.Engine):
     def draw_lines(self, env_id, start_verts, end_verts, cols, line_width):
         env_ptr = self.get_env(env_id)
         num_lines = start_verts.shape[0]
-        cols = cols[..., :3]
         verts = np.concatenate([start_verts, end_verts], axis=-1)
+        cols = cols[..., :3]
+        
         self._gym.add_lines(self._viewer, env_ptr, num_lines, verts, cols)
+        return
+    
+    def register_keyboard_callback(self, key_str, callback_func):
+        assert(key_str not in self._keyboard_callbacks)
+
+        key_code = str_to_key_code(key_str)
+        self._gym.subscribe_viewer_keyboard_event(self._viewer, key_code, key_str)
+        self._keyboard_callbacks[key_str] = callback_func
         return
 
     def _load_asset(self, file, fix_root):
-        if (file in self._asset_cache):
-            asset = self._asset_cache[file]
+        asset_cfg = AssetCfg(asset_file=file, fix_root=fix_root)
+
+        if (asset_cfg in self._asset_cache):
+            asset = self._asset_cache[asset_cfg]
         else:
             asset_options = gymapi.AssetOptions()
             asset_options.angular_damping = 0.01
@@ -491,10 +504,9 @@ class IsaacGymEngine(engine.Engine):
             file_name = os.path.basename(file)
             asset = self._gym.load_asset(self._sim, file_dir, file_name, asset_options)
 
-            self._asset_cache[file] = asset
+            self._asset_cache[asset_cfg] = asset
 
         return asset
-    
     
     def _build_ground(self):
         plane_params = gymapi.PlaneParams()
@@ -519,7 +531,6 @@ class IsaacGymEngine(engine.Engine):
         sim = self._gym.create_sim(compute_device_id, graphics_device_id, 
                                    physics_engine, sim_params)
         assert(sim is not None), "Failed to create simulator."
-        
         return sim
 
     def _apply_cmd(self):
@@ -530,17 +541,18 @@ class IsaacGymEngine(engine.Engine):
                 cmd_buf = self._get_dof_cmd_buf()
                 cmd_tensor = gymtorch.unwrap_tensor(cmd_buf)
                 self._gym.set_dof_position_target_tensor(self._sim, cmd_tensor)
+
             elif (self._control_mode == engine.ControlMode.vel):
                 cmd_buf = self._get_dof_cmd_buf()
                 cmd_tensor = gymtorch.unwrap_tensor(cmd_buf)
                 self._gym.set_dof_velocity_target_tensor(self._sim, cmd_tensor)
+                
             elif (self._control_mode == engine.ControlMode.torque):
                 pass
             elif (self._control_mode == engine.ControlMode.pd_explicit):
                 pass
             else:
                 assert(False), "Unsupported control mode: {}".format(self._control_mode)
-
         return
 
     def _pre_sim_step(self):
@@ -562,8 +574,6 @@ class IsaacGymEngine(engine.Engine):
 
     def _sim_step(self):
         self._gym.simulate(self._sim)
-        if (self._device == "cpu"):
-            self._gym.fetch_results(self._sim, True)
         return
 
     def _set_actuation_torque(self, torque):
@@ -579,7 +589,36 @@ class IsaacGymEngine(engine.Engine):
             self._objs_need_reset[env_id, obj_id] = True
         return
     
+    def _update_reset_objs(self):
+        obj_ids = self._need_reset_buf.nonzero(as_tuple=False)
+        obj_ids = obj_ids.type(torch.int32).flatten()
+
+        if (len(obj_ids) > 0):
+            self._gym.set_actor_root_state_tensor_indexed(self._sim,
+                                                         gymtorch.unwrap_tensor(self._root_state_raw),
+                                                         gymtorch.unwrap_tensor(obj_ids), len(obj_ids))
+            if (self._has_dof()):
+                has_dof = self._obj_dof_dims[obj_ids.type(torch.long)] > 0
+                dof_obj_ids = obj_ids[has_dof]
+                
+                if (dof_obj_ids.shape[0] > 0):
+                    self._gym.set_dof_state_tensor_indexed(self._sim,
+                                                        gymtorch.unwrap_tensor(self._dof_state_raw),
+                                                        gymtorch.unwrap_tensor(dof_obj_ids), len(dof_obj_ids))
+                    
+                    dof_pos = self._dof_state_raw[..., :, 0]
+                    dof_pos = dof_pos.contiguous()
+                    self._gym.set_dof_position_target_tensor_indexed(self._sim,
+                                                        gymtorch.unwrap_tensor(dof_pos),
+                                                        gymtorch.unwrap_tensor(dof_obj_ids), len(dof_obj_ids))
+
+            self._objs_need_reset[:] = False
+        return
+    
     def _refresh_sim_tensors(self):
+        if (self._device == "cpu"):
+            self._gym.fetch_results(self._sim, True)
+        
         self._gym.refresh_dof_state_tensor(self._sim)
         self._gym.refresh_actor_root_state_tensor(self._sim)
         self._gym.refresh_rigid_body_state_tensor(self._sim)
@@ -674,7 +713,6 @@ class IsaacGymEngine(engine.Engine):
             dof_props["damping"] = 0.0
         else:
             assert(False), "Unsupported control mode: {}".format(control_mode)
-
         return
 
     def _build_sim_tensors(self):
@@ -779,7 +817,6 @@ class IsaacGymEngine(engine.Engine):
         self._need_reset_buf = torch.zeros(num_objs, device=self._device, dtype=torch.bool)
         self._objs_need_reset = self._need_reset_buf.view((num_envs, self._objs_per_env))
         self._obj_dof_dims = self._build_obj_dof_dims()
-
         return
     
     def _build_control_tensors(self):
@@ -794,25 +831,26 @@ class IsaacGymEngine(engine.Engine):
 
         self._dof_cmd_raw = torch.zeros_like(self._kp_raw)
 
-        self._obj_dof_cmd = []
         self._obj_kp = []
         self._obj_kd = []
         self._obj_torque_lim = []
+        self._obj_dof_cmd = []
 
         dof_idx0 = 0
         objs_per_env = self.get_objs_per_env()
+
         for i in range(objs_per_env):
             obj_dof_dim = self.get_obj_num_dofs(i)
             dof_idx1 = dof_idx0 + obj_dof_dim
-            obj_dof_cmd = self._dof_cmd_raw[..., dof_idx0:dof_idx1]
             obj_kp = self._kp_raw[..., dof_idx0:dof_idx1]
             obj_kd = self._kd_raw[..., dof_idx0:dof_idx1]
             obj_torque_lim = self._torque_lim_raw[..., dof_idx0:dof_idx1]
+            obj_dof_cmd = self._dof_cmd_raw[..., dof_idx0:dof_idx1]
 
-            self._obj_dof_cmd.append(obj_dof_cmd)
             self._obj_kp.append(obj_kp)
             self._obj_kd.append(obj_kd)
             self._obj_torque_lim.append(obj_torque_lim)
+            self._obj_dof_cmd.append(obj_dof_cmd)
 
             dof_idx0 = dof_idx1
 
@@ -830,29 +868,6 @@ class IsaacGymEngine(engine.Engine):
             env_obj_dof_dims[:, obj_id] = num_dofs
 
         return obj_dof_dims
-
-    def _build_viewer(self):
-        # subscribe to keyboard shortcuts
-        self._viewer = self._gym.create_viewer(
-            self._sim, gymapi.CameraProperties())
-        self._gym.subscribe_viewer_keyboard_event(
-            self._viewer, gymapi.KEY_ESCAPE, "QUIT")
-        self._gym.subscribe_viewer_keyboard_event(
-            self._viewer, gymapi.KEY_V, "toggle_viewer_sync")
-
-        # set the camera position based on up axis
-        sim_params = self._gym.get_sim_params(self._sim)
-        if sim_params.up_axis == gymapi.UP_AXIS_Z:
-            cam_pos = gymapi.Vec3(20.0, 25.0, 3.0)
-            cam_target = gymapi.Vec3(10.0, 15.0, 0.0)
-        else:
-            cam_pos = gymapi.Vec3(20.0, 3.0, 25.0)
-            cam_target = gymapi.Vec3(10.0, 0.0, 15.0)
-
-        self._gym.viewer_camera_look_at(
-            self._viewer, None, cam_pos, cam_target)
-
-        return
     
     def _enable_dof_force_sensors(self):
         enable_dof_force_sensors = False
@@ -874,3 +889,31 @@ class IsaacGymEngine(engine.Engine):
 
         torque = self._kp_raw * (tar_dof - dof_pos) - self._kd_raw * dof_vel
         return torque
+    
+    def _build_viewer(self):
+        # subscribe to keyboard shortcuts
+        self._viewer = self._gym.create_viewer(self._sim, gymapi.CameraProperties())
+        self._gym.subscribe_viewer_keyboard_event(self._viewer, gymapi.KEY_ESCAPE, "QUIT")
+
+        # set the camera position based on up axis
+        sim_params = self._gym.get_sim_params(self._sim)
+        cam_pos = gymapi.Vec3(20.0, 25.0, 3.0)
+        cam_target = gymapi.Vec3(10.0, 15.0, 0.0)
+
+        self._gym.viewer_camera_look_at(self._viewer, None, cam_pos, cam_target)
+        return
+    
+    def _process_gui_events(self):
+        # check for window closed
+        if (self._gym.query_viewer_has_closed(self._viewer)):
+            sys.exit()
+
+        # check for keyboard events
+        for evt in self._gym.query_viewer_action_events(self._viewer):
+            if (evt.value > 0):
+                if (evt.action == "QUIT"):
+                    sys.exit()
+                elif (evt.action in self._keyboard_callbacks):
+                    callback = self._keyboard_callbacks[evt.action]
+                    callback()
+        return

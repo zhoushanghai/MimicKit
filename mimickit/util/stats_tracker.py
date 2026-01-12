@@ -7,7 +7,6 @@ class StatsTracker():
         self._mean = torch.zeros([n], device=device, dtype=torch.float32)
         self._mean_sq = torch.zeros([n], device=device, dtype=torch.float32)
         self._std = torch.zeros([n], device=device, dtype=torch.float32)
-        
         return
 
     def get_mean(self):
@@ -42,7 +41,6 @@ class StatsTracker():
         self._count = new_total
 
         self._std[:] = self._calc_std(self._mean, self._mean_sq)
-
         return
     
     def _calc_std(self, mean, mean_sq):

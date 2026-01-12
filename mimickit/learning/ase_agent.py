@@ -11,11 +11,12 @@ import envs.base_env as base_env
 import learning.distribution_gaussian_diag as distribution_gaussian_diag
 
 class ASEAgent(amp_agent.AMPAgent):
-    NAME = "ASE"
-
     def __init__(self, config, env, device):
         super().__init__(config, env, device)
         self._build_latent_buf()
+
+        num_envs = self.get_num_envs()
+        self._env_ids = torch.arange(num_envs, device=self._device, dtype=torch.long)
         return
     
     def _load_params(self, config):
@@ -30,7 +31,6 @@ class ASEAgent(amp_agent.AMPAgent):
         self._enc_loss_weight = config["enc_loss_weight"]
         self._enc_eval_batch_size = int(config.get("enc_eval_batch_size", 0))
         self._enc_reward_weight = config["enc_reward_weight"]
-
         return
     
     def _build_model(self, config):
@@ -94,8 +94,7 @@ class ASEAgent(amp_agent.AMPAgent):
     
     def _reset_latents(self, env_ids=None):
         if (env_ids is None):
-            num_envs = self.get_num_envs()
-            env_ids = torch.arange(num_envs, device=self._device, dtype=torch.long)
+            env_ids = self._env_ids
 
         if (len(env_ids) > 0):
             n = len(env_ids)
@@ -107,7 +106,6 @@ class ASEAgent(amp_agent.AMPAgent):
             curr_time = self._env.get_env_time(env_ids)
             rand_time = curr_time + dt
             self._latent_reset_time[env_ids] = rand_time
-
         return
     
     def _step_env(self, action):

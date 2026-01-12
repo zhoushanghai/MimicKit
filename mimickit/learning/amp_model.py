@@ -49,4 +49,3 @@ class AMPModel(ppo_model.PPOModel):
         obs_space = env.get_disc_obs_space()
         input_dict = {"disc_obs": obs_space}
         return input_dict
-    

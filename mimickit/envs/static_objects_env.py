@@ -3,8 +3,9 @@ import engines.engine as engine
 import numpy as np
 
 class StaticObjectsEnv(deepmimic_env.DeepMimicEnv):
-    def __init__(self, config, num_envs, device, visualize):
-        super().__init__(config=config, num_envs=num_envs, device=device, visualize=visualize)
+    def __init__(self, env_config, engine_config, num_envs, device, visualize):
+        super().__init__(env_config=env_config, engine_config=engine_config,
+                         num_envs=num_envs, device=device, visualize=visualize)
         return
     
     def _build_env(self, env_id, config):
@@ -12,9 +13,9 @@ class StaticObjectsEnv(deepmimic_env.DeepMimicEnv):
         self._build_static_object(env_id, config)
         return
     
-    def _build_static_object(self, env_id, config):
+    def _build_static_object(self, env_id, env_config):
         color = np.array([0.3, 0.3, 0.3])
-        objs_config = config["env"]["objects"]
+        objs_config = env_config["objects"]
 
         for i, obj_config in enumerate(objs_config):
             asset_file = obj_config["file"]

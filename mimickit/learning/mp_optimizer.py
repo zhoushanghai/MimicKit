@@ -48,11 +48,11 @@ class MPOptimizer():
     def _build_optimizer(self, config, param_list):
         lr = float(config["learning_rate"])
         weight_decay = float(config.get("weight_decay", 0.0))
-
         optimizer_type = config["type"]
-        if optimizer_type == "SGD":
+
+        if (optimizer_type == "SGD"):
             optimizer = torch.optim.SGD(param_list, lr, momentum=0.9, weight_decay=weight_decay)
-        elif optimizer_type == "Adam":
+        elif (optimizer_type == "Adam"):
             optimizer = torch.optim.AdamW(param_list, lr, weight_decay=weight_decay)
         else:
             assert(False), "Unsupported optimizer type: " + optimizer_type

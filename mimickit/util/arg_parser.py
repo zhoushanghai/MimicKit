@@ -35,11 +35,11 @@ class ArgParser(object):
                 self._table[curr_key] = vals
 
             vals = []
-
         return succ
 
     def load_file(self, filename):
         succ = False
+
         with open(filename, 'r') as file:
             lines = RE.split(r'[\n\r]+', file.read())
             file.close()
@@ -59,6 +59,7 @@ class ArgParser(object):
             if (arg_file != ''):
                 succ = self.load_file(arg_file)
                 assert succ, Logger.print("Failed to load args from: " + arg_file)
+        
         return succ
 
     def has_key(self, key):
@@ -116,14 +117,12 @@ class ArgParser(object):
         is_comment = False
         if (len(str) > 0):
             is_comment = str[0] == '#'
-
         return is_comment
         
     def _is_key(self, str):
         is_key = False
         if (len(str) >= 3):
             is_key = str[0] == '-' and str[1] == '-'
-
         return is_key
 
     def _parse_bool(self, str):

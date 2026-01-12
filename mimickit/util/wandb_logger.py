@@ -13,7 +13,6 @@ class WandbLogger(logger.Logger):
         self._param_config = param_config
         self._step_var_key = None
         self._collections = dict()
-
         return
     
     def reset(self):
@@ -64,7 +63,6 @@ class WandbLogger(logger.Logger):
                     out_dict[tag] = val
 
             wandb.log(out_dict, step=int(step_val))
-
         return
     
     def _add_collection(self, name, key):

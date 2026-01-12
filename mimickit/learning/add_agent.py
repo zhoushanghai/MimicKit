@@ -7,8 +7,6 @@ import util.torch_util as torch_util
 import learning.diff_normalizer as diff_normalizer
 
 class ADDAgent(amp_agent.AMPAgent):
-    NAME = "ADD"
-
     def __init__(self, config, env, device):
         super().__init__(config, env, device)
 
@@ -106,8 +104,9 @@ class ADDAgent(amp_agent.AMPAgent):
         disc_loss += self._disc_logit_reg * disc_logit_loss
 
         # grad penalty
-        disc_neg_grad = torch.autograd.grad(disc_neg_logit, norm_diff_obs, grad_outputs=torch.ones_like(disc_neg_logit),
-                                             create_graph=True, retain_graph=True, only_inputs=True)
+        disc_neg_grad = torch.autograd.grad(disc_neg_logit, norm_diff_obs, 
+                                            grad_outputs=torch.ones_like(disc_neg_logit),
+                                            create_graph=True, retain_graph=True, only_inputs=True)
         disc_neg_grad = disc_neg_grad[0]
         disc_neg_grad_squared = torch.sum(torch.square(disc_neg_grad), dim=-1)
         disc_grad_penalty = torch.mean(disc_neg_grad_squared)
@@ -121,7 +120,6 @@ class ADDAgent(amp_agent.AMPAgent):
             disc_loss += self._disc_weight_decay * disc_weight_decay
 
         disc_neg_acc, disc_pos_acc = self._compute_disc_acc(disc_neg_logit, disc_pos_logit)
-
         disc_pos_logit_mean = torch.mean(disc_pos_logit)
         disc_neg_logit_mean = torch.mean(disc_neg_logit)
 

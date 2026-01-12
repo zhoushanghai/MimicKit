@@ -88,7 +88,6 @@ def quat_to_axis_angle(q):
 
     return axis, angle
 
-
 @torch.jit.script
 def quat_to_matrix(q):
     # type: (Tensor) -> Tensor
@@ -151,7 +150,6 @@ def angle_to_matrix(angle, axis):
 
     return torch.stack(R_flat, -1).reshape(angle.shape + (3, 3))
 
-
 def euler_angle_to_matrix(euler, axis_order):
     b = 1 if len(euler.shape)<=1 else euler.shape[0]
     euler = euler[None,...] if len(euler.shape)==0 else euler 
@@ -160,7 +158,6 @@ def euler_angle_to_matrix(euler, axis_order):
         mat_0 = angle_to_matrix(euler[...,i], axis_order[i])
         mat = torch.matmul(mat, mat_0)
     return mat
-
 
 @torch.jit.script
 def matrix_to_axis_angle(R):
@@ -178,7 +175,6 @@ def matrix_to_axis_angle(R):
     axis = axis / norm
     return axis, angle
 
-
 @torch.jit.script
 def axis_angle_to_quat(axis, angle):
     # type: (Tensor, Tensor) -> Tensor
@@ -187,7 +183,6 @@ def axis_angle_to_quat(axis, angle):
     w = theta.cos()
     return quat_unit(torch.cat([xyz, w], dim=-1))
 
-
 @torch.jit.script
 def axis_angle_to_exp_map(axis, angle):
     # type: (Tensor, Tensor) -> Tensor
@@ -195,15 +190,12 @@ def axis_angle_to_exp_map(axis, angle):
     exp_map = angle_expand * axis
     return exp_map
 
-
 @torch.jit.script
 def matrix_to_quat(R):
     # type: (Tensor) -> Tensor
     axis, angle = matrix_to_axis_angle(R)
     quat = axis_angle_to_quat(axis, angle)
     return quat
-
-
 
 @torch.jit.script
 def quat_to_exp_map(q):
@@ -260,7 +252,6 @@ def exp_map_to_quat(exp_map):
     axis, angle = exp_map_to_axis_angle(exp_map)
     q = axis_angle_to_quat(axis, angle)
     return q
-
 
 @torch.jit.script
 def quat_diff(q0, q1):
@@ -341,7 +332,7 @@ def calc_heading_quat_inv(q):
 
 # from isaacgym.torch_utils
 @torch.jit.script
-def quat_from_euler_xyz(roll, pitch, yaw):
+def euler_xyz_to_quat(roll, pitch, yaw):
     cy = torch.cos(yaw * 0.5)
     sy = torch.sin(yaw * 0.5)
     cr = torch.cos(roll * 0.5)
@@ -359,7 +350,7 @@ def quat_from_euler_xyz(roll, pitch, yaw):
 @torch.jit.script
 def euler_xyz_to_exp_map(roll, pitch, yaw):
     # type: (Tensor, Tensor, Tensor) -> Tensor
-    q = quat_from_euler_xyz(roll, pitch, yaw)
+    q = euler_xyz_to_quat(roll, pitch, yaw)
     exp_map = quat_to_exp_map(q)
     return exp_map
 
@@ -409,7 +400,6 @@ def calc_layers_out_size(layers):
             out_size = m.out_features
             break
     return out_size
-
 
 def eval_minibatch(fn, inputs, batch_size):
     if (batch_size > 0):

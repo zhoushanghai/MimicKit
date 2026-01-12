@@ -1,33 +1,33 @@
 import yaml
 
-import learning.dummy_agent as dummy_agent
-import learning.ppo_agent as ppo_agent
-import learning.awr_agent as awr_agent
-import learning.amp_agent as amp_agent
-import learning.ase_agent as ase_agent
-import learning.add_agent as add_agent
 from util.logger import Logger
 
 def build_agent(agent_file, env, device):
     if (agent_file is None or agent_file == ""):
-        agent_name = dummy_agent.DummyAgent.NAME
+        agent_name = "Dummy"
     else:
         agent_config = load_agent_file(agent_file)
         agent_name = agent_config["agent_name"]
 
     Logger.print("Building {} agent".format(agent_name))
 
-    if (agent_name == dummy_agent.DummyAgent.NAME):
+    if (agent_name == "Dummy"):
+        import learning.dummy_agent as dummy_agent
         agent = dummy_agent.DummyAgent(env=env, device=device)
-    elif (agent_name == ppo_agent.PPOAgent.NAME):
+    elif (agent_name == "PPO"):
+        import learning.ppo_agent as ppo_agent
         agent = ppo_agent.PPOAgent(config=agent_config, env=env, device=device)
-    elif (agent_name == awr_agent.AWRAgent.NAME):
+    elif (agent_name == "AWR"):
+        import learning.awr_agent as awr_agent
         agent = awr_agent.AWRAgent(config=agent_config, env=env, device=device)
-    elif (agent_name == amp_agent.AMPAgent.NAME):
+    elif (agent_name == "AMP"):
+        import learning.amp_agent as amp_agent
         agent = amp_agent.AMPAgent(config=agent_config, env=env, device=device)
-    elif (agent_name == ase_agent.ASEAgent.NAME):
+    elif (agent_name == "ASE"):
+        import learning.ase_agent as ase_agent
         agent = ase_agent.ASEAgent(config=agent_config, env=env, device=device)
-    elif (agent_name == add_agent.ADDAgent.NAME):
+    elif (agent_name == "ADD"):
+        import learning.add_agent as add_agent
         agent = add_agent.ADDAgent(config=agent_config, env=env, device=device)
     else:
         assert(False), "Unsupported agent: {}".format(agent_name)

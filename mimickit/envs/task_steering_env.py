@@ -7,8 +7,7 @@ import util.torch_util as torch_util
 
 
 class TaskSteeringEnv(amp_env.AMPEnv):
-    def __init__(self, config, num_envs, device, visualize):
-        env_config = config["env"]
+    def __init__(self, env_config, engine_config, num_envs, device, visualize):
         self._rand_tar_dir = env_config.get("rand_tar_dir", True)
         self._rand_face_dir = env_config.get("rand_face_dir", True)
         self._tar_speed_min = env_config["tar_speed_min"]
@@ -21,8 +20,8 @@ class TaskSteeringEnv(amp_env.AMPEnv):
 
         self._reward_steering_vel_scale = float(env_config["reward_steering_vel_scale"])
 
-        super().__init__(config=config, num_envs=num_envs, device=device, visualize=visualize)
-
+        super().__init__(env_config=env_config, engine_config=engine_config,
+                         num_envs=num_envs, device=device, visualize=visualize)
         return
     
     def _build_envs(self, config, num_envs):
@@ -48,7 +47,6 @@ class TaskSteeringEnv(amp_env.AMPEnv):
 
                 assert(tar_marker_id0 == tar_marker_id)
                 assert(face_marker_id0 == face_marker_id)
-
         return
     
     def _build_markers(self, env_id):
@@ -86,7 +84,6 @@ class TaskSteeringEnv(amp_env.AMPEnv):
         
         self._tar_dir[..., 0] = 1.0
         self._face_dir[..., 0] = 1.0
-
         return
     
     def _get_tar_marker_id(self):
@@ -142,7 +139,6 @@ class TaskSteeringEnv(amp_env.AMPEnv):
         face_axis[..., -1] = 1.0
         face_marker_rot = torch_util.axis_angle_to_quat(tar_axis, face_theta)
 
-
         self._engine.set_root_pos(env_ids, tar_marker_id, marker_pos)
         self._engine.set_root_rot(env_ids, tar_marker_id, marker_rot)
         self._engine.set_root_vel(env_ids, tar_marker_id, 0.0)
@@ -152,7 +148,6 @@ class TaskSteeringEnv(amp_env.AMPEnv):
         self._engine.set_root_rot(env_ids, face_marker_id, face_marker_rot)
         self._engine.set_root_vel(env_ids, face_marker_id, 0.0)
         self._engine.set_root_ang_vel(env_ids, face_marker_id, 0.0)
-        
         return
     
     def _update_task(self):
@@ -161,12 +156,6 @@ class TaskSteeringEnv(amp_env.AMPEnv):
 
         if len(rest_env_ids) > 0:
             self._reset_task(rest_env_ids)
-            
-        if (self._visualize):
-            num_envs = self._engine.get_num_envs()
-            env_ids = torch.arange(num_envs, device=self._device, dtype=torch.long)
-            self._update_marker(env_ids)
-        
         return
     
     def _reset_envs(self, env_ids):
@@ -177,7 +166,19 @@ class TaskSteeringEnv(amp_env.AMPEnv):
         return
 
     def _reset_task(self, env_ids):
-        n = len(env_ids)
+        self._reset_tar(env_ids)
+
+        n = env_ids.shape[0]
+        rand_dt = torch.rand(n, device=self._device)
+        rand_dt = (self._tar_change_time_max - self._tar_change_time_min) * rand_dt + self._tar_change_time_min
+        self._tar_change_times[env_ids] = self._time_buf[env_ids] + rand_dt
+        
+        if (self._visualize):
+            self._update_marker(env_ids)
+        return
+
+    def _reset_tar(self, env_ids):
+        n = env_ids.shape[0]
 
         if (self._rand_tar_dir):
             rand_theta = 2 * np.pi * torch.rand(n, device=self._device) - np.pi
@@ -193,17 +194,9 @@ class TaskSteeringEnv(amp_env.AMPEnv):
         tar_speed = (self._tar_speed_max - self._tar_speed_min) * torch.rand(n, device=self._device) + self._tar_speed_min
         face_tar_dir = torch.stack([torch.cos(rand_face_theta), torch.sin(rand_face_theta)], dim=-1)
 
-        rand_dt = torch.rand(n, device=self._device)
-        rand_dt = (self._tar_change_time_max - self._tar_change_time_min) * rand_dt + self._tar_change_time_min
-        
         self._tar_speed[env_ids] = tar_speed
         self._tar_dir[env_ids] = tar_dir
         self._face_dir[env_ids] = face_tar_dir
-        self._tar_change_times[env_ids] = self._time_buf[env_ids] + rand_dt
-        
-        if (self._visualize):
-            self._update_marker(env_ids)
-
         return
     
     def _compute_obs(self, env_ids=None):

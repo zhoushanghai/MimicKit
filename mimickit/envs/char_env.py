@@ -4,31 +4,24 @@ import numpy as np
 import os
 import torch
 
-import anim.kin_char_model as kin_char_model
 import anim.motion_lib as motion_lib
 import engines.engine as engine
 import envs.sim_env as sim_env
 import envs.base_env as base_env
+import util.camera as camera
 from util.logger import Logger
 import util.torch_util as torch_util
 
 import engines.engine as engine
 
-class CameraMode(enum.Enum):
-    still = 0
-    track = 1
-
 class CharEnv(sim_env.SimEnv):
-    def __init__(self, config, num_envs, device, visualize):
-        env_config = config["env"]
+    def __init__(self, env_config, engine_config, num_envs, device, visualize):
         self._global_obs = env_config["global_obs"]
         self._root_height_obs = env_config.get("root_height_obs", True)
         self._zero_center_action = env_config.get("zero_center_action", False)
-
-        self._camera_mode = CameraMode[env_config["camera_mode"]]
-
-        super().__init__(config=config, num_envs=num_envs, device=device,
-                         visualize=visualize)
+        
+        super().__init__(env_config=env_config, engine_config=engine_config,
+                         num_envs=num_envs, device=device, visualize=visualize)
         
         char_id = self._get_char_id()
         self._print_char_prop(0, char_id)
@@ -55,8 +48,7 @@ class CharEnv(sim_env.SimEnv):
         self._init_dof_pos = init_dof_pos
         return
 
-    def _build_envs(self, config, num_envs):
-        env_config = config["env"]
+    def _build_envs(self, env_config, num_envs):
         char_file = env_config["char_file"]
         self._build_kin_char_model(char_file)
         
@@ -69,14 +61,14 @@ class CharEnv(sim_env.SimEnv):
             Logger.print("Building {:d}/{:d} envs".format(e + 1, num_envs), end='\r')
             env_id = self._engine.create_env()
             assert(env_id == e)
-            self._build_env(env_id, config)
+            self._build_env(env_id, env_config)
 
         Logger.print("\n")
         return
     
-    def _build_env(self, env_id, config):
+    def _build_env(self, env_id, env_config):
         char_col = self._get_char_color()
-        char_id = self._build_character(env_id, config, color=char_col)
+        char_id = self._build_character(env_id, env_config, color=char_col)
 
         if (env_id == 0):
             self._char_ids.append(char_id)
@@ -86,8 +78,8 @@ class CharEnv(sim_env.SimEnv):
         
         return 
     
-    def _build_character(self, env_id, config, color=None):
-        char_file = config["env"]["char_file"]
+    def _build_character(self, env_id, env_config, color=None):
+        char_file = env_config["char_file"]
         char_id = self._engine.create_obj(env_id=env_id, 
                                           obj_type=engine.ObjType.articulated,
                                           asset_file=char_file, 
@@ -100,25 +92,27 @@ class CharEnv(sim_env.SimEnv):
     def _build_kin_char_model(self, char_file):
         _, file_ext = os.path.splitext(char_file)
         if (file_ext == ".xml"):
-            char_model = kin_char_model.KinCharModel(self._device)
+            import anim.mjcf_char_model as mjcf_char_model
+            char_model = mjcf_char_model.MJCFCharModel(self._device)
+        elif (file_ext == ".urdf"):
+            import anim.urdf_char_model as urdf_char_model
+            char_model = urdf_char_model.URDFCharModel(self._device)
         else:
             print("Unsupported character file format: {:s}".format(file_ext))
             assert(False)
 
         self._kin_char_model = char_model
-        self._kin_char_model.load_char_file(char_file)
+        self._kin_char_model.load(char_file)
         return
     
-    def _build_sim_tensors(self, config):
-        super()._build_sim_tensors(config)
+    def _build_sim_tensors(self, env_config):
+        super()._build_sim_tensors(env_config)
         
         self._action_bound_low = torch.tensor(self._action_space.low, device=self._device)
         self._action_bound_high = torch.tensor(self._action_space.high, device=self._device)
         
-        env_config = config["env"]
         key_bodies = env_config.get("key_bodies", [])
         self._key_body_ids = self._build_body_ids_tensor(key_bodies)
-
         return
     
     def _build_action_space(self):
@@ -132,7 +126,7 @@ class CharEnv(sim_env.SimEnv):
 
         elif (control_mode == engine.ControlMode.torque):
             char_id = self._get_char_id()
-            torque_lim = self._engine.get_obj_torque_lim(0, char_id)
+            torque_lim = self._engine.get_obj_torque_limits(0, char_id)
             low, high = self._build_action_bounds_torque(torque_lim)
 
         elif (control_mode == engine.ControlMode.pos
@@ -288,7 +282,6 @@ class CharEnv(sim_env.SimEnv):
                                key_pos=key_pos,
                                global_obs=self._global_obs,
                                root_height_obs=self._root_height_obs)
-
         return obs
     
     def _reset_envs(self, env_ids):
@@ -348,50 +341,33 @@ class CharEnv(sim_env.SimEnv):
     def _has_key_bodies(self):
         return len(self._key_body_ids) > 0
 
-    def _init_camera(self):
+    def _build_camera(self, env_config):
+        env_id = 0
         char_id = self._get_char_id()
         char_root_pos = self._engine.get_root_pos(char_id)
-        char_pos = char_root_pos[0].cpu().numpy()
+        char_pos = char_root_pos[env_id].cpu().numpy()
             
-        cam_pos = [char_pos[0], char_pos[1] - 5.0, 3.0]
-        cam_target = [char_pos[0], char_pos[1], 0.0]
+        cam_pos = np.array([char_pos[0], char_pos[1] - 5.0, 3.0])
+        cam_target = np.array([char_pos[0], char_pos[1], 1.0])
 
-        self._engine.update_camera(cam_pos, cam_target)
-        self._cam_prev_char_pos = char_pos
+        cam_mode = camera.CameraMode[env_config["camera_mode"]]
+        self._camera = camera.Camera(mode=cam_mode,
+                                     engine=self._engine,
+                                     pos=cam_pos,
+                                     target=cam_target,
+                                     track_env_id=env_id,
+                                     track_obj_id=char_id)
         return
-
-    def _update_camera(self):
-        if (self._camera_mode is CameraMode.still):
-            pass
-        elif (self._camera_mode is CameraMode.track):
-            char_id = self._get_char_id()
-            char_root_pos = self._engine.get_root_pos(char_id)
-            char_pos = char_root_pos[0].cpu().numpy()
-            
-            cam_pos = self._engine.get_camera_pos()
-            cam_delta = cam_pos - self._cam_prev_char_pos
-
-            new_cam_target = np.array([char_pos[0], char_pos[1], 1.0])
-            new_cam_pos = np.array([char_pos[0] + cam_delta[0], 
-                                    char_pos[1] + cam_delta[1], 
-                                    cam_pos[2]])
-
-            self._engine.update_camera(new_cam_pos, new_cam_target)
-
-            self._cam_prev_char_pos[:] = char_pos
-        else:
-            assert(False), "Unsupported camera mode {}".format(self._camera_mode)
-
-        return
-
+    
     def _get_char_color(self):
         engine_name = self._engine.get_name()
         if (engine_name == "isaac_lab"):
             col = np.array([0.2, 0.25, 0.7])
+        elif (engine_name == "newton"):
+            col = np.array([0.35, 0.45, 0.7])
         else:
             col = np.array([0.5, 0.65, 0.95])
         return col
-
 
 
 #####################################################################
@@ -442,7 +418,6 @@ def compute_char_obs(root_pos, root_rot, root_vel, root_ang_vel, joint_rot, dof_
         root_rot_obs = torch_util.quat_to_tan_norm(local_root_rot)
         root_vel_obs = torch_util.quat_rotate(heading_rot, root_vel)
         root_ang_vel_obs = torch_util.quat_rotate(heading_rot, root_ang_vel)
-
 
     joint_rot_flat = torch.reshape(joint_rot, [joint_rot.shape[0] * joint_rot.shape[1], joint_rot.shape[2]])
     joint_rot_obs_flat = torch_util.quat_to_tan_norm(joint_rot_flat)

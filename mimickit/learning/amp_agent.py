@@ -8,8 +8,6 @@ import learning.ppo_agent as ppo_agent
 import util.torch_util as torch_util
 
 class AMPAgent(ppo_agent.PPOAgent):
-    NAME = "AMP"
-
     def __init__(self, config, env, device):
         super().__init__(config, env, device)
         return

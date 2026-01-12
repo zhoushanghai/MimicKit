@@ -100,7 +100,8 @@ class Normalizer(torch.nn.Module):
         self._count = torch.nn.Parameter(torch.zeros([1], device=device, requires_grad=False, dtype=torch.long), requires_grad=False)
         self._mean = torch.nn.Parameter(torch.zeros(shape, device=device, requires_grad=False, dtype=self.dtype), requires_grad=False)
         self._std = torch.nn.Parameter(torch.ones(shape, device=device, requires_grad=False, dtype=self.dtype), requires_grad=False)
-
+        self._mean_sq = None
+        
         if init_mean is not None:
             assert init_mean.shape == shape, \
             Logger.print('Normalizer init mean shape mismatch, expecting {:d}, but got {:d}'.shape(shape, init_mean.shape))
@@ -110,8 +111,6 @@ class Normalizer(torch.nn.Module):
             assert init_std.shape == shape, \
             Logger.print('Normalizer init std shape mismatch, expecting {:d}, but got {:d}'.format(shape, init_std.shape))
             self._std[:] = init_std
-
-        self._mean_sq = None
         
         self._new_count = 0
         self._new_sum = torch.zeros_like(self._mean)

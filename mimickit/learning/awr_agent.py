@@ -9,8 +9,6 @@ import util.mp_util as mp_util
 import util.torch_util as torch_util
 
 class AWRAgent(base_agent.BaseAgent):
-    NAME = "AWR"
-
     def __init__(self, config, env, device):
         super().__init__(config, env, device)
         return
@@ -35,7 +33,6 @@ class AWRAgent(base_agent.BaseAgent):
         self._exp_anneal_samples = config.get("exp_anneal_samples", np.inf)
         self._exp_prob_beg = config.get("exp_prob_beg", 1.0)
         self._exp_prob_end = config.get("exp_prob_end", 1.0)
-        
         return
 
     def _build_model(self, config):

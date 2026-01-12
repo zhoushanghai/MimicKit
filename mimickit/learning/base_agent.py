@@ -24,8 +24,6 @@ class AgentMode(enum.Enum):
     TEST = 1
 
 class BaseAgent(torch.nn.Module):
-    NAME = "base"
-
     def __init__(self, config, env, device):
         super().__init__()
 
@@ -48,14 +46,23 @@ class BaseAgent(torch.nn.Module):
         self._mode = AgentMode.TRAIN
         self._curr_obs = None
         self._curr_info = None
-
         return
 
-    def train_model(self, max_samples, out_model_file, int_output_dir, logger_type, log_file):
+    def train_model(self, max_samples, out_dir, save_int_models, logger_type):
         start_time = time.time()
 
-        self._curr_obs, self._curr_info = self._reset_envs()
+        out_model_file = os.path.join(out_dir, "model.pt")
+        log_file = os.path.join(out_dir, "log.txt")
         self._logger = self._build_logger(logger_type, log_file, self._config)
+
+        if (save_int_models):
+            int_out_dir = os.path.join(out_dir, "int_models")
+            if (mp_util.is_root_proc() and not os.path.exists(int_out_dir)):
+                os.makedirs(int_out_dir, exist_ok=True)
+        else:
+            int_out_dir = ""
+        
+        self._curr_obs, self._curr_info = self._reset_envs()
         self._init_train()
 
         while self._sample_count < max_samples:
@@ -73,7 +80,7 @@ class BaseAgent(torch.nn.Module):
 
             if (output_iter):
                 self._logger.write_log()
-                self._output_train_model(self._iter, out_model_file, int_output_dir)
+                self._output_train_model(self._iter, out_model_file, int_out_dir)
 
                 self._train_return_tracker.reset()
                 self._curr_obs, self._curr_info = self._reset_envs()
@@ -153,6 +160,7 @@ class BaseAgent(torch.nn.Module):
         obs_space = self._env.get_obs_space()
         obs_dtype = torch_util.numpy_dtype_to_torch(obs_space.dtype)
         self._obs_norm = normalizer.Normalizer(obs_space.shape, clip=10.0, device=self._device, dtype=obs_dtype)
+
         self._a_norm = self._build_action_normalizer()
         return
     
@@ -176,6 +184,7 @@ class BaseAgent(torch.nn.Module):
                                                  init_std=a_std, min_std=0, dtype=a_dtype)
         else:
             assert(False), "Unsupported action space: {}".format(a_space)
+
         return a_norm
 
     def _build_optimizer(self, config):
@@ -216,6 +225,7 @@ class BaseAgent(torch.nn.Module):
         log.set_step_key("Samples")
         if (mp_util.is_root_proc()):
             log.configure_output_file(log_file)
+        
         return log
 
     def _update_sample_count(self):
@@ -268,7 +278,6 @@ class BaseAgent(torch.nn.Module):
             
             self._curr_obs, self._curr_info = self._reset_done_envs(done)
             self._exp_buffer.inc()
-
         return
     
     def _rollout_test(self, num_episodes):
@@ -408,12 +417,12 @@ class BaseAgent(torch.nn.Module):
 
         self._logger.log("Obs_Norm_Mean", obs_norm_mean, quiet=True)
         self._logger.log("Obs_Norm_Std", obs_norm_std, quiet=True)
-        
         return
     
     def _compute_action_bound_loss(self, norm_a_dist):
         loss = None
         action_space = self._env.get_action_space()
+
         if (isinstance(action_space, spaces.Box)):
             a_low = action_space.low
             a_high = action_space.high
@@ -432,10 +441,10 @@ class BaseAgent(torch.nn.Module):
 
         return loss
 
-    def _output_train_model(self, iter, out_model_file, int_output_dir):
+    def _output_train_model(self, iter, out_model_file, int_out_dir):
         self.save(out_model_file)
 
-        if (int_output_dir != ""):
-            int_model_file = os.path.join(int_output_dir, "model_{:010d}.pt".format(iter))
+        if (int_out_dir != ""):
+            int_model_file = os.path.join(int_out_dir, "model_{:010d}.pt".format(iter))
             self.save(int_model_file)
         return

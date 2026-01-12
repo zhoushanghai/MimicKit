@@ -168,6 +168,7 @@ class MotionLib():
 
         motion_files, motion_weights = self._fetch_motion_files(motion_file)
         num_motion_files = len(motion_files)
+
         for f in range(num_motion_files):
             curr_file = motion_files[f]
             Logger.print("Loading {:d}/{:d} motion files: {:s}".format(f + 1, num_motion_files, curr_file))
@@ -216,7 +217,6 @@ class MotionLib():
             self._frame_joint_rot.append(joint_rot)
             self._frame_dof_vel.append(dof_vel)
 
-
         self._motion_weights = torch.tensor(self._motion_weights, dtype=torch.float32, device=self._device)
         self._motion_weights /= self._motion_weights.sum()
 
@@ -244,7 +244,6 @@ class MotionLib():
         lengths_shifted = self._motion_num_frames.roll(1)
         lengths_shifted[0] = 0
         self._motion_start_idx = lengths_shifted.cumsum(0)
-        
         return
 
     def _fetch_motion_files(self, motion_file):
@@ -281,5 +280,4 @@ def calc_phase(times, motion_len, loop_mode):
     phase[loop_wrap_mask] = phase_wrap
         
     phase = torch.clip(phase, 0.0, 1.0)
-
     return phase

@@ -1,35 +1,41 @@
 import engines.engine_builder as engine_builder
 
 import abc
-import envs.base_env as base_env
+import enum
 import gymnasium.spaces as spaces
 import numpy as np
 import torch
 
+import envs.base_env as base_env
 import util.torch_util as torch_util
+import util.camera as camera
+
+class PlayMode(enum.Enum):
+    PLAY = 0
+    ONE_STEP = 1
+    PAUSE = 2
 
 class SimEnv(base_env.BaseEnv):
     NAME = "sim_env"
 
-    def __init__(self, config, num_envs, device, visualize):
+    def __init__(self, env_config, engine_config, num_envs, device, visualize):
         super().__init__(visualize=visualize)
 
         self._device = device
-
-        env_config = config["env"]
         self._episode_length = env_config["episode_length"] # episode length in seconds
         
-        engine_config = config["engine"]
         self._engine = self._build_engine(engine_config, num_envs, device, visualize)
-        self._build_envs(config, num_envs)
+        self._build_envs(env_config, num_envs)
         self._engine.initialize_sim()
         
         self._action_space = self._build_action_space()
-        self._build_sim_tensors(config)
+        self._build_sim_tensors(env_config)
         self._build_data_buffers()
 
         if self._visualize:
-            self._init_camera()
+            self._play_mode = PlayMode.PLAY
+            self._build_camera(env_config)
+            self._setup_gui()
 
         return
     
@@ -47,20 +53,19 @@ class SimEnv(base_env.BaseEnv):
     
     def reset(self, env_ids=None):
         if (env_ids is None):
-            num_envs = self.get_num_envs()
-            reset_env_ids = torch.arange(num_envs, device=self._device, dtype=torch.long)
+            reset_env_ids = self._env_ids
         else:
             reset_env_ids = env_ids
 
         self._reset_envs(reset_env_ids)
-        self._engine.update_sim_state()
-
+        
         self._update_observations(env_ids)
         self._update_info(env_ids)
 
         return self._obs_buf, self._info
     
     def step(self, action):
+        # apply actions
         self._pre_physics_step(action)
 
         self._physics_step()
@@ -92,7 +97,18 @@ class SimEnv(base_env.BaseEnv):
         return
     
     def _render(self):
-        self._update_camera()
+        while True:
+            self._update_camera()
+            self._render_scene()
+
+            if (self._play_mode != PlayMode.PAUSE):
+                break
+        
+        if (self._play_mode == PlayMode.ONE_STEP):
+            self._play_mode = PlayMode.PAUSE
+        return
+    
+    def _render_scene(self):
         self._engine.render()
         return
     
@@ -107,6 +123,7 @@ class SimEnv(base_env.BaseEnv):
         return
     
     def _update_camera(self):
+        self._camera.update()
         return
 
     @abc.abstractmethod
@@ -152,6 +169,8 @@ class SimEnv(base_env.BaseEnv):
         return
     
     def _build_sim_tensors(self, config):
+        num_envs = self.get_num_envs()
+        self._env_ids = torch.arange(num_envs, device=self._device, dtype=torch.long)
         return
 
     def _build_data_buffers(self):
@@ -186,6 +205,29 @@ class SimEnv(base_env.BaseEnv):
     def _build_action_space(self):
         return
     
-    @abc.abstractmethod
-    def _init_camera(self):
+    def _build_camera(self, env_config):
+        cam_pos = np.array([0.0, -5.0, 3.0])
+        cam_target = np.arrray([0.0, 0.0, 0.0])
+        cam_mode = env_config.get("camera_mode", "still")
+        cam_mode = camera.CameraMode[cam_mode]
+
+        self._camera = camera.Camera(mode=cam_mode,
+                                     engine=self._engine,
+                                     pos=cam_pos,
+                                     target=cam_target)
+        return
+    
+    def _setup_gui(self):
+        def toggle_play():
+            if (self._play_mode == PlayMode.PLAY):
+                self._play_mode = PlayMode.PAUSE
+            else:
+                self._play_mode = PlayMode.PLAY
+            return
+        self._engine.register_keyboard_callback("ENTER", toggle_play)
+
+        def one_step():
+            self._play_mode = PlayMode.ONE_STEP
+            return
+        self._engine.register_keyboard_callback("SPACE", one_step)
         return

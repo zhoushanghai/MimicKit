@@ -6,11 +6,11 @@ import torch
 import engines.engine as engine
 
 class CharDofTestEnv(char_env.CharEnv):
-    def __init__(self, config, num_envs, device, visualize):
+    def __init__(self, env_config, engine_config, num_envs, device, visualize):
         self._time_per_dof = 4.0
 
-        super().__init__(config=config, num_envs=num_envs, device=device,
-                         visualize=visualize)
+        super().__init__(env_config=env_config, engine_config=engine_config,
+                         num_envs=num_envs, device=device, visualize=visualize)
 
         self._episode_length = self._time_per_dof * self._pd_low.shape[0]
         return
@@ -30,15 +30,12 @@ class CharDofTestEnv(char_env.CharEnv):
         return
 
     def _calc_test_action(self, actions):
-        test_actions = torch.zeros_like(actions)
-
-        num_envs = self._engine.get_num_envs()
         num_dofs = self._pd_low.shape[0]
-        env_ids = torch.arange(num_envs, device=self._device, dtype=torch.long)
+        test_actions = torch.zeros_like(actions)
 
         phase = self._time_buf / self._time_per_dof
         dof_id = phase.type(torch.long)
-        dof_id = dof_id + env_ids
+        dof_id = dof_id + self._env_ids
         dof_id = torch.remainder(dof_id, num_dofs)
 
         curr_low = self._pd_low[dof_id]
@@ -54,8 +51,8 @@ class CharDofTestEnv(char_env.CharEnv):
 
         return test_actions
     
-    def _build_character(self, env_id, config, color=None):
-        char_file = config["env"]["char_file"]
+    def _build_character(self, env_id, env_config, color=None):
+        char_file = env_config["char_file"]
         char_id = self._engine.create_obj(env_id=env_id, 
                                           obj_type=engine.ObjType.articulated,
                                           asset_file=char_file,

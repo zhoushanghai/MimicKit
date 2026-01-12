@@ -39,7 +39,6 @@ class PPOModel(base_model.BaseModel):
         input_dict = self._build_actor_input_dict(env)
         self._actor_layers, layers_info = net_builder.build_net(net_name, input_dict,
                                                                 activation=self._activation)
-        
         self._action_dist = self._build_action_distribution(config, env, self._actor_layers)
         return
     

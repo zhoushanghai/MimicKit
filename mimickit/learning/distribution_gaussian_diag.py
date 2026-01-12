@@ -24,16 +24,18 @@ class DistributionGaussianDiagBuilder(torch.nn.Module):
         if (self._std_type == StdType.FIXED):
             self._logstd_net = torch.nn.Parameter(torch.zeros(out_size, requires_grad=False, dtype=torch.float32), requires_grad=False)
             torch.nn.init.constant_(self._logstd_net, logstd)
+
         elif (self._std_type == StdType.CONSTANT):
             self._logstd_net = torch.nn.Parameter(torch.zeros(out_size, requires_grad=True, dtype=torch.float32), requires_grad=True)
             torch.nn.init.constant_(self._logstd_net, logstd)
+
         elif (self._std_type == StdType.VARIABLE):
             self._logstd_net = torch.nn.Linear(in_size, out_size)
             torch.nn.init.uniform_(self._logstd_net.weight, -init_output_scale, init_output_scale) 
             torch.nn.init.constant_(self._logstd_net.bias, logstd)
+
         else:
             assert(False), "Unsupported StdType: {}".format(self._std_type)
-
         return
 
     def forward(self, input):
