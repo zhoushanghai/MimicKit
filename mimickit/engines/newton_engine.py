@@ -902,6 +902,7 @@ class NewtonEngine(engine.Engine):
                 obj_builder.add_mjcf(
                     asset_file,
                     floating=not fix_root,
+                    ignore_inertial_definitions=False,
                     collapse_fixed_joints=False,
                     enable_self_collisions=enable_self_collisions,
                     convert_3d_hinge_to_ball_joints=True
@@ -910,6 +911,7 @@ class NewtonEngine(engine.Engine):
                 obj_builder.add_urdf(
                     asset_file,
                     floating=not fix_root,
+                    ignore_inertial_definitions=False,
                     collapse_fixed_joints=False,
                     enable_self_collisions=enable_self_collisions,
                     joint_ordering="dfs"
@@ -952,7 +954,7 @@ class NewtonEngine(engine.Engine):
         return
 
     def _build_ground_contact_sensor(self):
-        self._ground_contact_sensor = newton.sensors.ContactSensor(self._sim_model,
+        self._ground_contact_sensor = newton.sensors.SensorContact(self._sim_model,
                                                                    sensing_obj_bodies="*",
                                                                    counterpart_shapes="ground*",
                                                                    include_total=True,
