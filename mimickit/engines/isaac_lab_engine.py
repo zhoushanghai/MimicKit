@@ -659,7 +659,7 @@ class IsaacLabEngine(engine.Engine):
         from isaacsim.core.utils.stage import get_current_stage
         
         sim_cfg = sim_utils.SimulationCfg(device=self._device, dt=sim_timestep,
-                                          render_interval=1)
+                                          render_interval=self._sim_steps)
         
         sim_cfg.physx.bounce_threshold_velocity = 0.2
         sim_cfg.physx.max_position_iteration_count = 4
@@ -670,6 +670,10 @@ class IsaacLabEngine(engine.Engine):
         
         self._sim = sim_utils.SimulationContext(sim_cfg)
         self._stage = get_current_stage()
+        
+        # disable delays during rendering
+        carb_settings = carb.settings.get_settings()
+        carb_settings.set_bool("/app/runLoops/main/rateLimitEnabled", False)
         return
     
     def _get_env_spacing(self):
