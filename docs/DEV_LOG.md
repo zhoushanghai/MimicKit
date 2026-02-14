@@ -99,12 +99,14 @@ python mimickit/run.py \
 
 
 ---
-训练
+训练 16 条 run walk 数据
+disc_replay_samples: 
+
 python mimickit/run.py \
-  --mode train \
-  --num_envs 8192 \
-  --engine_config data/engines/isaac_lab_engine.yaml \
-  --env_config data/envs/amp_steering_g1_env.yaml \
-  --agent_config data/agents/amp_task_g1_agent.yaml \
-  --visualize false \
-  --out_dir output/
+    --mode train \
+    --num_envs 512 \
+    --engine_config data/engines/isaac_lab_engine.yaml \
+    --env_config data/envs/amp_steering_g1_env.yaml \
+    --agent_config data/agents/amp_task_g1_agent.yaml \
+    --visualize false \
+    --out_dir output/
