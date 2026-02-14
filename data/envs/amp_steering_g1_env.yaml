@@ -22,7 +22,7 @@ contact_bodies: ["left_knee_link", "left_ankle_pitch_link", "left_ankle_roll_lin
 rand_tar_dir: True
 rand_face_dir: False
 tar_speed_min: 0.0
-tar_speed_max: 3.0
+tar_speed_max: 1.0
 tar_change_time_min: 4.0
 tar_change_time_max: 7.0
 
