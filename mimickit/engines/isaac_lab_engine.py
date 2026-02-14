@@ -483,6 +483,7 @@ class IsaacLabEngine(engine.Engine):
                                               env_ids=env_id,
                                               body_ids=sim_body_id,
                                               is_global=True)
+            obj.has_external_wrench = True
         return
     
     def get_obj_torque_limits(self, env_id, obj_id):
@@ -727,12 +728,13 @@ class IsaacLabEngine(engine.Engine):
 
     def _clear_forces(self):
         for obj in self._objs:
-            if (obj.has_external_wrench):
+            if (getattr(obj, "has_external_wrench", False)):
                 forces = torch.zeros([1, 3], dtype=torch.float, device=self._device)
                 torques = torch.zeros([1, 3], dtype=torch.float, device=self._device)
                 obj.set_external_force_and_torque(forces=forces, torques=torques,
                                                   positions=None, env_ids=None,
                                                   body_ids=None, is_global=True)
+                obj.has_external_wrench = False
         return
     
     def _validate_envs(self):
@@ -763,6 +765,7 @@ class IsaacLabEngine(engine.Engine):
 
         for obj_id in range(objs_per_env):
             obj = self._build_obj(obj_id)
+            obj.has_external_wrench = False
             self._objs.append(obj)
         return
     
