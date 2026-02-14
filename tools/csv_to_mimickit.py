@@ -12,17 +12,39 @@ import numpy as np
 import pickle
 
 
+def quaternion_to_expmap(qx, qy, qz, qw):
+    """
+    Convert quaternion to exponential map.
+    """
+    norm = np.sqrt(qx*qx + qy*qy + qz*qz + qw*qw)
+    if norm < 1e-10:
+        return 0.0, 0.0, 0.0
+    qx, qy, qz, qw = qx/norm, qy/norm, qz/norm, qw/norm
+
+    if qw > 0.99999:
+        return 0.0, 0.0, 0.0
+    if qw < -0.99999:
+        return np.pi * 2 * np.array([qx, qy, qz]) / (np.sqrt(qx*qx + qy*qy + qz*qz) + 1e-10)
+
+    angle = 2.0 * np.arccos(np.clip(qw, -1.0, 1.0))
+    sin_half_angle = np.sqrt(1.0 - qw*qw)
+    if sin_half_angle < 1e-10:
+        return 0.0, 0.0, 0.0
+
+    axis = np.array([qx, qy, qz]) / sin_half_angle
+    expmap = axis * angle
+    return expmap[0], expmap[1], expmap[2]
+
+
 def convert_csv_to_pkl(csv_path, pkl_path, fps=30, loop_mode=1):
     """
     Convert CSV motion file to MimicKit PKL format.
-
-    Args:
-        csv_path: Path to input CSV file
-        pkl_path: Path to output PKL file
-        fps: Frames per second (default: 30)
-        loop_mode: 0 = CLAMP, 1 = WRAP (default: 1)
     """
-    # Read CSV file
+    # Use 0 as Y (let physics engine calculate height from ground)
+    # Reference files have Y close to 0, so we set it to 0
+    base_height = 0
+
+    # Process frames
     frames = []
     with open(csv_path, 'r') as f:
         for line in f:
@@ -30,27 +52,27 @@ def convert_csv_to_pkl(csv_path, pkl_path, fps=30, loop_mode=1):
             if not line:
                 continue
 
-            # Split by comma
             values = line.split(',')
+            values = [float(v) for v in values]
 
-            # CSV has 36 values: root(7) + 29 joints = 36
-            # Root: X(0), Y(1), Z(2), QX(3), QY(4), QZ(5), QW(6)
-            # Joints: 29 values at indices 7-35
-            # PKL needs 35 values: root(6, skip Y) + 29 joints = 35
-            values = [float(v) for v in values]  # 36 values
+            root_x = values[0]
+            root_y = values[1]
+            root_z = values[2]
+            qx, qy, qz, qw = values[3], values[4], values[5], values[6]
 
-            # Remove root Y (index 1): keep X(0), Z-QW(2-6), joints(7-35)
-            joint_data = values[0:1] + values[2:7] + values[7:36]
+            # Convert quaternion to exponential map
+            ex, ey, ez = quaternion_to_expmap(qx, qy, qz, qw)
 
+            # Use original Y value
+            root_y_relative = root_y
+
+            joint_data = [root_x, root_y_relative, root_z, ex, ey, ez] + values[7:36]
             frames.append(joint_data)
 
-    # Convert to numpy array
     frames = np.array(frames, dtype=np.float32)
-
     print(f"Loaded {len(frames)} frames")
     print(f"Frame shape: {frames.shape}")
 
-    # Save as PKL
     motion_data = {
         "loop_mode": loop_mode,
         "fps": fps,
@@ -61,7 +83,6 @@ def convert_csv_to_pkl(csv_path, pkl_path, fps=30, loop_mode=1):
         pickle.dump(motion_data, f)
 
     print(f"Saved to: {pkl_path}")
-    return
 
 
 if __name__ == "__main__":
@@ -72,5 +93,4 @@ if __name__ == "__main__":
     parser.add_argument("--loop", type=int, default=1, choices=[0, 1], help="Loop mode: 0=CLAMP, 1=WRAP (default: 1)")
 
     args = parser.parse_args()
-
     convert_csv_to_pkl(args.input, args.output, args.fps, args.loop)
