@@ -6,4 +6,4 @@ output/
 .vscode/
 wandb/
 AGENT.md
-data/
+

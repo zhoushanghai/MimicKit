@@ -90,10 +90,21 @@ python mimickit/run.py \
 测试脚本
 data/envs/view_motion_g1_env.yaml
 修改地址
-
 python mimickit/run.py \
   --mode test \
   --num_envs 4 \
   --engine_config data/engines/isaac_lab_engine.yaml \
   --env_config data/envs/view_motion_g1_env.yaml \
   --visualize true
+
+
+---
+训练
+python mimickit/run.py \
+  --mode train \
+  --num_envs 8192 \
+  --engine_config data/engines/isaac_lab_engine.yaml \
+  --env_config data/envs/amp_steering_g1_env.yaml \
+  --agent_config data/agents/amp_task_g1_agent.yaml \
+  --visualize false \
+  --out_dir output/

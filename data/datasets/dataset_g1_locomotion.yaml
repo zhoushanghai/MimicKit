@@ -1,0 +1,36 @@
+motions:
+  # Run motions
+  - file: "/home/hz/datasets/g1_mimickit_pkl/run1_subject2.pkl"
+    weight: 1.0
+  - file: "/home/hz/datasets/g1_mimickit_pkl/run1_subject5.pkl"
+    weight: 1.0
+  - file: "/home/hz/datasets/g1_mimickit_pkl/run2_subject1.pkl"
+    weight: 1.0
+  - file: "/home/hz/datasets/g1_mimickit_pkl/run2_subject4.pkl"
+    weight: 1.0
+
+  # Walk motions
+  - file: "/home/hz/datasets/g1_mimickit_pkl/walk1_subject1.pkl"
+    weight: 1.0
+  - file: "/home/hz/datasets/g1_mimickit_pkl/walk1_subject2.pkl"
+    weight: 1.0
+  - file: "/home/hz/datasets/g1_mimickit_pkl/walk1_subject5.pkl"
+    weight: 1.0
+  - file: "/home/hz/datasets/g1_mimickit_pkl/walk2_subject1.pkl"
+    weight: 1.0
+  - file: "/home/hz/datasets/g1_mimickit_pkl/walk2_subject3.pkl"
+    weight: 1.0
+  - file: "/home/hz/datasets/g1_mimickit_pkl/walk2_subject4.pkl"
+    weight: 1.0
+  - file: "/home/hz/datasets/g1_mimickit_pkl/walk3_subject1.pkl"
+    weight: 1.0
+  - file: "/home/hz/datasets/g1_mimickit_pkl/walk3_subject2.pkl"
+    weight: 1.0
+  - file: "/home/hz/datasets/g1_mimickit_pkl/walk3_subject3.pkl"
+    weight: 1.0
+  - file: "/home/hz/datasets/g1_mimickit_pkl/walk3_subject4.pkl"
+    weight: 1.0
+  - file: "/home/hz/datasets/g1_mimickit_pkl/walk3_subject5.pkl"
+    weight: 1.0
+  - file: "/home/hz/datasets/g1_mimickit_pkl/walk4_subject1.pkl"
+    weight: 1.0
