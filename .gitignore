@@ -6,4 +6,5 @@ output/
 .vscode/
 wandb/
 AGENT.md
+.claude/
 

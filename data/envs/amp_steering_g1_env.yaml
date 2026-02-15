@@ -12,7 +12,8 @@ enable_tar_obs: False
 num_disc_obs_steps: 10
 rand_reset: True
 
-ref_char_offset: [2.0, 0.0, 0.0] # m
+# ref_char_offset: [2.0, 0.0, 0.0] # m
+ref_char_offset: [0.0, 0.0, 0.0] # m
 init_pose: [0, 0, 0.8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.57, 0, 0, 0, 0, 0, 0, 1.57, 0, 0, 0]
 
 enable_early_termination: True
